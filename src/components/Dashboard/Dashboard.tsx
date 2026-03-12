@@ -5,7 +5,7 @@ import {
 } from 'recharts'
 import { TrendingUp, Target, Zap, Download } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { AttentionBudget, PomodoroSession, CATEGORY_COLORS } from '../../types'
+import { AttentionBudget, PomodoroSession } from '../../types'
 
 interface Props {
   userId: string

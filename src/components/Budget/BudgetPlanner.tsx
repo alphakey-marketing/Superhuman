@@ -9,7 +9,6 @@ interface Props {
   date: string
 }
 
-// ─── Category metadata ───────────────────────────────────────────────────────
 const CATEGORY_META: Record<string, { emoji: string; what: string; examples: string }> = {
   'Deep Work': {
     emoji: '🧠',
@@ -28,7 +27,7 @@ const CATEGORY_META: Record<string, { emoji: string; what: string; examples: str
   },
   'Admin': {
     emoji: '📋',
-    what: 'Routine, low-focus tasks that keep things running but don\'t stretch your brain.',
+    what: "Routine, low-focus tasks that keep things running but don't stretch your brain.",
     examples: 'Emails, meetings, scheduling, filing, form-filling, quick replies',
   },
   'Exercise': {
@@ -48,7 +47,6 @@ const CATEGORY_META: Record<string, { emoji: string; what: string; examples: str
   },
 }
 
-// ─── Day templates tailored to office worker (9-6, lunch 12:30-2) ────────────
 const DAY_TEMPLATES = [
   {
     id: 'office',
@@ -104,7 +102,7 @@ const DAY_TEMPLATES = [
   {
     id: 'recovery',
     label: '🧘 Recovery Day',
-    desc: 'Low intensity — when you\'re tired or need to recharge',
+    desc: "Low intensity — when you're tired or need to recharge",
     tip: 'Even on recovery days, 1h of real focus moves the needle.',
     allocations: [
       { category: 'Admin',     hours: 2 },
@@ -116,16 +114,14 @@ const DAY_TEMPLATES = [
   },
 ]
 
-// Available real work hours for an office worker (9-6, lunch 12:30-2, commute 1h each way)
 const AVAILABLE_BLOCKS = [
   { label: 'Morning focus (9–12:30)', hours: 3.5 },
   { label: 'Lunch break (12:30–2)', hours: 1.5 },
   { label: 'Afternoon (2–6)', hours: 4 },
   { label: 'Evening at home (7–10)', hours: 3 },
 ]
-const REAL_AVAILABLE_HOURS = AVAILABLE_BLOCKS.reduce((s, b) => s + b.hours, 0) // 12h
+const REAL_AVAILABLE_HOURS = AVAILABLE_BLOCKS.reduce((s, b) => s + b.hours, 0)
 const TOTAL_HOURS = 16
-
 const CATEGORIES = Object.keys(CATEGORY_COLORS)
 
 export default function BudgetPlanner({ userId, date }: Props) {
@@ -162,11 +158,9 @@ export default function BudgetPlanner({ userId, date }: Props) {
     const template = DAY_TEMPLATES.find(t => t.id === templateId)
     if (!template || applyingTemplate) return
     setApplyingTemplate(true)
-    // Delete existing budgets for today
     if (budgets.length > 0) {
       await supabase.from('attention_budgets').delete().eq('user_id', userId).eq('date', date)
     }
-    // Insert template allocations
     const inserts = template.allocations.map(a => ({
       user_id: userId,
       date,
@@ -214,7 +208,7 @@ export default function BudgetPlanner({ userId, date }: Props) {
   return (
     <div className="space-y-5">
 
-      {/* ── Day Templates ─────────────────────────────────────────────── */}
+      {/* Day Templates */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
         <button
           onClick={() => setShowTemplates(v => !v)}
@@ -228,7 +222,6 @@ export default function BudgetPlanner({ userId, date }: Props) {
           </div>
           {showTemplates ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
         </button>
-
         {showTemplates && (
           <div className="px-4 pb-4 space-y-2">
             <p className="text-gray-500 text-xs mb-3">Pick a template based on how you want today to go. You can adjust after.</p>
@@ -237,7 +230,7 @@ export default function BudgetPlanner({ userId, date }: Props) {
                 key={t.id}
                 onClick={() => applyTemplate(t.id)}
                 disabled={applyingTemplate}
-                className="w-full text-left p-3.5 bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-indigo-600/50 rounded-xl transition-all active:scale-[0.99] disabled:opacity-50"
+                className="w-full text-left p-3.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-indigo-600/50 rounded-xl transition-all active:scale-[0.99] disabled:opacity-50"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1">
@@ -260,7 +253,7 @@ export default function BudgetPlanner({ userId, date }: Props) {
         )}
       </div>
 
-      {/* ── Category explainer cards ───────────────────────────────────── */}
+      {/* Category explainer */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
         <button
           onClick={() => setExpandedMeta(expandedMeta === '__all__' ? null : '__all__')}
@@ -288,7 +281,7 @@ export default function BudgetPlanner({ userId, date }: Props) {
         )}
       </div>
 
-      {/* ── Available hours context ────────────────────────────────────── */}
+      {/* Available hours */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
         <p className="text-gray-400 text-xs font-medium mb-2">⏰ Your real available hours today</p>
         <div className="space-y-1.5">
@@ -310,7 +303,7 @@ export default function BudgetPlanner({ userId, date }: Props) {
         )}
       </div>
 
-      {/* ── Allocation bar ─────────────────────────────────────────────── */}
+      {/* Allocation bar */}
       {budgets.length > 0 && (
         <div>
           <div className="flex justify-between text-xs text-gray-400 mb-2">
@@ -353,7 +346,7 @@ export default function BudgetPlanner({ userId, date }: Props) {
         </div>
       )}
 
-      {/* ── Draggable budget list ──────────────────────────────────────── */}
+      {/* Draggable budget list */}
       <DragDropContext onDragEnd={onDragEnd}>
         <Droppable droppableId="budgets">
           {(provided) => (
@@ -408,7 +401,6 @@ export default function BudgetPlanner({ userId, date }: Props) {
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
-                        {/* Inline explainer */}
                         {expandedMeta === budget.category && meta && (
                           <div className="px-4 pb-3 pt-0">
                             <div className="bg-gray-900 rounded-lg p-3 border border-gray-700">
@@ -428,7 +420,7 @@ export default function BudgetPlanner({ userId, date }: Props) {
         </Droppable>
       </DragDropContext>
 
-      {/* ── Add custom category ────────────────────────────────────────── */}
+      {/* Add manually */}
       <div>
         <p className="text-gray-600 text-xs mb-2 px-1">Or add manually:</p>
         <div className="flex items-center gap-2 bg-gray-800/40 rounded-xl p-3 border border-gray-700 border-dashed">
@@ -453,7 +445,6 @@ export default function BudgetPlanner({ userId, date }: Props) {
           <button
             onClick={addBudget}
             disabled={isOverBudget || saving}
-            title={isOverBudget ? 'Budget exceeded' : 'Add'}
             className="p-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex-shrink-0"
           >
             {saving
@@ -466,7 +457,7 @@ export default function BudgetPlanner({ userId, date }: Props) {
         )}
       </div>
 
-      {/* ── Summary cards ─────────────────────────────────────────────── */}
+      {/* Summary cards */}
       {budgets.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
           {[
