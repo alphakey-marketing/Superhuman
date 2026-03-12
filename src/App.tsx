@@ -5,13 +5,14 @@ import LoginForm from './components/Auth/LoginForm'
 import BudgetPlanner from './components/Budget/BudgetPlanner'
 import PomodoroTimer from './components/Pomodoro/PomodoroTimer'
 import Dashboard from './components/Dashboard/Dashboard'
+import UATBanner from './components/UATBanner'
 
 type Tab = 'dashboard' | 'budget' | 'pomodoro'
 
 const tabs = [
   { id: 'dashboard' as Tab, label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'budget' as Tab, label: 'Planner', icon: Target },
-  { id: 'pomodoro' as Tab, label: 'Timer', icon: Timer },
+  { id: 'budget'    as Tab, label: 'Planner',   icon: Target },
+  { id: 'pomodoro'  as Tab, label: 'Timer',     icon: Timer },
 ]
 
 export default function App() {
@@ -19,7 +20,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const today = new Date().toISOString().split('T')[0]
+  const today      = new Date().toISOString().split('T')[0]
   const todayLabel = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'short', day: 'numeric',
   })
@@ -39,6 +40,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
+
+      {/* UAT warning banner — only visible when VITE_UAT_MODE=true */}
+      <UATBanner />
+
       {/* Header */}
       <header className="border-b border-gray-800 bg-gray-950/95 backdrop-blur sticky top-0 z-50">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -53,14 +58,12 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Desktop signout */}
             <button
               onClick={() => signOut()}
               className="hidden sm:flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-xs transition-colors px-2 py-1 rounded-lg hover:bg-gray-800"
             >
               <LogOut className="w-3.5 h-3.5" /> Sign Out
             </button>
-            {/* Mobile menu */}
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className="sm:hidden p-1.5 text-gray-500 hover:text-gray-300"
@@ -70,7 +73,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Mobile dropdown */}
         {menuOpen && (
           <div className="sm:hidden border-t border-gray-800 bg-gray-900 px-4 py-3">
             <button
