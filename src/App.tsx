@@ -1,29 +1,39 @@
 import { useState } from 'react'
-import { Brain, LayoutDashboard, Target, Timer, LogOut, Menu, X } from 'lucide-react'
+import { Brain, LayoutDashboard, Target, Timer, LogOut, Menu, X, BarChart2, Leaf } from 'lucide-react'
 import { useAuth } from './hooks/useAuth'
+import { useDistraction } from './hooks/useDistraction'
 import LoginForm from './components/Auth/LoginForm'
 import BudgetPlanner from './components/Budget/BudgetPlanner'
 import PomodoroTimer from './components/Pomodoro/PomodoroTimer'
 import Dashboard from './components/Dashboard/Dashboard'
+import DistractionTracker from './components/Analytics/DistractionTracker'
+import StreakWidget from './components/Analytics/StreakWidget'
+import RestorationBreak from './components/Breaks/RestorationBreak'
 import UATBanner from './components/UATBanner'
 
-type Tab = 'dashboard' | 'budget' | 'pomodoro'
+type Tab = 'dashboard' | 'budget' | 'pomodoro' | 'analytics'
 
 const tabs = [
-  { id: 'dashboard' as Tab, label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'budget'    as Tab, label: 'Planner',   icon: Target },
-  { id: 'pomodoro'  as Tab, label: 'Timer',     icon: Timer },
+  { id: 'dashboard'  as Tab, label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'budget'     as Tab, label: 'Planner',   icon: Target },
+  { id: 'pomodoro'   as Tab, label: 'Timer',     icon: Timer },
+  { id: 'analytics'  as Tab, label: 'Analytics', icon: BarChart2 },
 ]
 
 export default function App() {
   const { user, loading, signOut } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showBreak, setShowBreak] = useState(false)
+  const [pomodoroRunning, setPomodoroRunning] = useState(false)
 
   const today      = new Date().toISOString().split('T')[0]
   const todayLabel = new Date().toLocaleDateString('en-US', {
     weekday: 'long', month: 'short', day: 'numeric',
   })
+
+  // Auto-track tab switches as distractions during focus sessions
+  useDistraction(user?.id, pomodoroRunning)
 
   if (loading) {
     return (
@@ -40,8 +50,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
-
-      {/* UAT warning banner — only visible when VITE_UAT_MODE=true */}
       <UATBanner />
 
       {/* Header */}
@@ -58,6 +66,15 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Restoration break button — always accessible */}
+            <button
+              onClick={() => setShowBreak(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-800/40 text-emerald-400 text-xs rounded-lg transition-colors"
+            >
+              <Leaf className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Break</span>
+            </button>
+
             <button
               onClick={() => signOut()}
               className="hidden sm:flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-xs transition-colors px-2 py-1 rounded-lg hover:bg-gray-800"
@@ -74,7 +91,13 @@ export default function App() {
         </div>
 
         {menuOpen && (
-          <div className="sm:hidden border-t border-gray-800 bg-gray-900 px-4 py-3">
+          <div className="sm:hidden border-t border-gray-800 bg-gray-900 px-4 py-3 space-y-2">
+            <button
+              onClick={() => { setShowBreak(true); setMenuOpen(false) }}
+              className="flex items-center gap-2 text-emerald-400 text-sm"
+            >
+              <Leaf className="w-4 h-4" /> Take a Break
+            </button>
             <button
               onClick={() => { signOut(); setMenuOpen(false) }}
               className="flex items-center gap-2 text-gray-400 text-sm"
@@ -94,7 +117,7 @@ export default function App() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm border-b-2 transition-all font-medium ${
+                className={`flex items-center gap-2 px-3 py-3 text-sm border-b-2 transition-all font-medium ${
                   activeTab === tab.id
                     ? 'border-indigo-500 text-white'
                     : 'border-transparent text-gray-500 hover:text-gray-300'
@@ -116,7 +139,10 @@ export default function App() {
               <h2 className="text-xl font-bold text-white">Dashboard</h2>
               <p className="text-gray-500 text-sm mt-0.5">Your attention overview for today</p>
             </div>
-            <Dashboard userId={user.id} />
+            <StreakWidget userId={user.id} />
+            <div className="mt-4">
+              <Dashboard userId={user.id} />
+            </div>
           </>
         )}
         {activeTab === 'budget' && (
@@ -134,10 +160,30 @@ export default function App() {
               <h2 className="text-xl font-bold text-white">Focus Timer</h2>
               <p className="text-gray-500 text-sm mt-0.5">25-5 Pomodoro with distraction logging</p>
             </div>
-            <PomodoroTimer userId={user.id} />
+            <PomodoroTimer
+              userId={user.id}
+              onRunningChange={setPomodoroRunning}
+            />
+          </>
+        )}
+        {activeTab === 'analytics' && (
+          <>
+            <div className="mb-5">
+              <h2 className="text-xl font-bold text-white">Analytics</h2>
+              <p className="text-gray-500 text-sm mt-0.5">Distraction patterns this week</p>
+            </div>
+            <DistractionTracker userId={user.id} />
           </>
         )}
       </main>
+
+      {/* Restoration break modal */}
+      {showBreak && user && (
+        <RestorationBreak
+          userId={user.id}
+          onClose={() => setShowBreak(false)}
+        />
+      )}
     </div>
   )
 }

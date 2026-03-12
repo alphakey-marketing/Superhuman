@@ -20,19 +20,40 @@ export interface PomodoroSession {
   status: 'active' | 'completed' | 'abandoned'
 }
 
+export interface RestSession {
+  id: string
+  user_id: string
+  type: 'nature' | 'breathing' | 'binaural'
+  duration_seconds: number
+  mood_before: number | null
+  mood_after: number | null
+  completed: boolean
+  started_at: string
+}
+
+export interface DistractionEvent {
+  id: string
+  user_id: string
+  occurred_at: string
+  source: 'tab_switch' | 'manual'
+}
+
 export type PomodoroMode = 'focus' | 'short_break' | 'long_break'
 
-// ------------------------------------
 // UAT / Production toggle
-// Set VITE_UAT_MODE=true in .env.local to use short durations for testing
-// Set VITE_UAT_MODE=false (or omit) for real production timings
-// ------------------------------------
 const IS_UAT = import.meta.env.VITE_UAT_MODE === 'true'
 
 export const POMODORO_DURATIONS: Record<PomodoroMode, number> = {
-  focus:       IS_UAT ? 10 : 25 * 60,   // UAT: 10s  | Prod: 25min
-  short_break: IS_UAT ? 5  : 5 * 60,    // UAT: 5s   | Prod: 5min
-  long_break:  IS_UAT ? 8  : 15 * 60,   // UAT: 8s   | Prod: 15min
+  focus:       IS_UAT ? 10 : 25 * 60,
+  short_break: IS_UAT ? 5  : 5 * 60,
+  long_break:  IS_UAT ? 8  : 15 * 60,
+}
+
+// Break durations (UAT = shorter)
+export const BREAK_DURATIONS = {
+  nature:    IS_UAT ? 8  : 5 * 60,   // 5 min
+  breathing: IS_UAT ? 8  : 4 * 60,   // 4 min
+  binaural:  IS_UAT ? 10 : 10 * 60,  // 10 min
 }
 
 export const CATEGORY_COLORS: Record<string, string> = {
@@ -45,5 +66,4 @@ export const CATEGORY_COLORS: Record<string, string> = {
   'Social':    '#f97316',
 }
 
-// Expose for UI banner
 export { IS_UAT }

@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Play, Pause, RotateCcw, AlertTriangle, ChevronRight } from 'lucide-react'
+import { Play, Pause, RotateCcw, AlertTriangle, ChevronRight, Leaf } from 'lucide-react'
 import { usePomodoro } from '../../hooks/usePomodoro'
 import { PomodoroMode } from '../../types'
 
 interface Props {
   userId: string
+  onRunningChange?: (running: boolean) => void
 }
 
 const MODE_LABELS: Record<PomodoroMode, string> = {
@@ -37,11 +38,25 @@ const DURATIONS: Record<PomodoroMode, number> = {
   long_break: 15 * 60,
 }
 
-export default function PomodoroTimer({ userId }: Props) {
+export default function PomodoroTimer({ userId, onRunningChange }: Props) {
   const { state, start, pause, reset, abandon, addDistraction, setTask, switchMode } = usePomodoro(userId)
   const [taskInput, setTaskInput] = useState('')
 
   const { mode, timeLeft, isRunning, cycles, distractions } = state
+
+  // Notify parent of running state for distraction tracking
+  const handleStart = () => {
+    start()
+    onRunningChange?.(true)
+  }
+  const handlePause = () => {
+    pause()
+    onRunningChange?.(false)
+  }
+  const handleAbandon = () => {
+    abandon()
+    onRunningChange?.(false)
+  }
 
   const totalSeconds = DURATIONS[mode]
   const progress = timeLeft / totalSeconds
@@ -93,7 +108,6 @@ export default function PomodoroTimer({ userId }: Props) {
             className="transition-all duration-1000 ease-linear"
           />
         </svg>
-
         <div className="absolute flex flex-col items-center gap-1">
           <span className={`text-6xl font-mono font-bold tabular-nums tracking-tight ${MODE_COLORS[mode]}`}>
             {mins}:{secs}
@@ -115,33 +129,30 @@ export default function PomodoroTimer({ userId }: Props) {
         className="w-full bg-gray-800 text-white text-sm px-4 py-3 rounded-xl border border-gray-700 focus:border-indigo-500 outline-none text-center placeholder:text-gray-600 transition-colors"
       />
 
-      {/* Main controls */}
+      {/* Controls */}
       <div className="flex items-center gap-4">
         <button
           onClick={reset}
           disabled={isRunning}
           className="p-3.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed text-gray-400 rounded-xl transition-colors"
-          title="Reset"
         >
           <RotateCcw className="w-5 h-5" />
         </button>
-
         <button
-          onClick={isRunning ? pause : start}
+          onClick={isRunning ? handlePause : handleStart}
           className={`px-12 py-4 rounded-xl font-semibold text-white flex items-center gap-2 text-base transition-all shadow-lg ${
             isRunning
-              ? 'bg-gray-700 hover:bg-gray-600 shadow-gray-900'
+              ? 'bg-gray-700 hover:bg-gray-600'
               : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/30 hover:scale-105'
           }`}
         >
           {isRunning ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 fill-white" />}
           {isRunning ? 'Pause' : 'Start'}
         </button>
-
         <button
           onClick={addDistraction}
           className="p-3.5 bg-gray-800 hover:bg-yellow-900/40 text-yellow-500 rounded-xl transition-colors"
-          title="Log a distraction (e.g. checked phone)"
+          title="Log a distraction"
         >
           <AlertTriangle className="w-5 h-5" />
         </button>
@@ -157,9 +168,7 @@ export default function PomodoroTimer({ userId }: Props) {
             }`}
           />
         ))}
-        {cycles >= 4 && (
-          <span className="text-gray-500 text-xs ml-1">×{Math.floor(cycles / 4) + 1}</span>
-        )}
+        {cycles >= 4 && <span className="text-gray-500 text-xs ml-1">×{Math.floor(cycles / 4) + 1}</span>}
       </div>
 
       {/* Stats */}
@@ -181,25 +190,28 @@ export default function PomodoroTimer({ userId }: Props) {
         <div className="flex items-start gap-2 bg-yellow-900/20 border border-yellow-800/40 rounded-xl px-4 py-3 w-full">
           <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
           <p className="text-yellow-300/80 text-xs">
-            {distractions} distraction{distractions > 1 ? 's' : ''} logged. Each break in focus costs ~23 min to regain deep work. Keep going!
+            {distractions} distraction{distractions > 1 ? 's' : ''} logged. Each costs ~23min to regain deep focus. Try a restoration break after this session.
           </p>
         </div>
       )}
 
-      {/* Next mode hint */}
-      {!isRunning && cycles > 0 && (
-        <div className="flex items-center gap-2 text-gray-500 text-xs">
-          <ChevronRight className="w-3 h-3" />
-          Next: {cycles % 4 === 0 ? '🌿 Long Break (15min)' : '☕ Short Break (5min)'} after this focus session
+      {/* Break suggestion after session */}
+      {!isRunning && cycles > 0 && mode !== 'focus' && (
+        <div className="flex items-center gap-2 bg-emerald-900/20 border border-emerald-800/30 rounded-xl px-4 py-3 w-full">
+          <Leaf className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <p className="text-emerald-300/80 text-xs">Great session! Hit the 🌿 Break button in the header for a science-backed restoration break.</p>
         </div>
       )}
 
-      {/* Abandon */}
+      {!isRunning && cycles === 0 && (
+        <div className="flex items-center gap-1.5 text-gray-500 text-xs">
+          <ChevronRight className="w-3 h-3" />
+          After 4 cycles: 🌿 Long Break (15min)
+        </div>
+      )}
+
       {(isRunning || state.sessionId) && (
-        <button
-          onClick={abandon}
-          className="text-gray-600 hover:text-red-400 text-xs transition-colors mt-1"
-        >
+        <button onClick={handleAbandon} className="text-gray-600 hover:text-red-400 text-xs transition-colors">
           Abandon session
         </button>
       )}
