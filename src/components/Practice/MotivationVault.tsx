@@ -5,28 +5,49 @@ import { MotivationEntry, VAULT_TYPES } from '../../types'
 
 interface Props { userId: string }
 
-// 20 "Prove Them Wrong" starter statements
+// 20 statements — core theme: "I will get so good that people who want me to fail will be miserable"
+// Each from a different angle / perspective / emotional tone
 const PROOF_STARTERS = [
-  "They said I couldn't. Every rep I do proves them wrong.",
-  "The ones who doubted me are the ones watching now.",
-  "I don't need your belief. I have my own.",
-  "Underestimated. Overlooked. Unstoppable. Watch.",
-  "Every hour I log is a letter to everyone who wrote me off.",
-  "They saw the ceiling. I saw the starting line.",
-  "Quiet. Build. Let the results be loud.",
-  "The best revenge is an extraordinary life.",
-  "I'm not doing this to prove you wrong. I'm doing it to prove myself right.",
-  "They said it was too late. I said watch me.",
-  "Nobody believed in the version of me I'm becoming. That's fine.",
-  "I was counted out. I'm still counting.",
-  "The doubters gave me the most powerful fuel I've ever had.",
-  "Average was never my destination. I just had to leave.",
-  "They laughed at the plan. They'll respect the result.",
-  "My consistency is the argument. I let it speak.",
-  "One day they'll ask how I did it. I'll say: I never stopped.",
-  "Every morning I wake up is another day they're wrong.",
-  "I don't need a crowd. I need a calendar and a goal.",
-  "The gap between who I was and who I'm becoming — that's my proof.",
+  // 1. Cold obsession
+  "I will get so good at this that the people who wanted me to fail won't be able to sleep at night.",
+  // 2. Silence as weapon
+  "I stopped arguing. I started compounding. Every skill I stack is a sentence they can't finish.",
+  // 3. The irony angle
+  "The funniest thing I'll ever do is become exactly what they said I'd never be — in front of them.",
+  // 4. Long game
+  "They celebrated my early failures. I'm building something so undeniable it'll haunt them for years.",
+  // 5. Discipline as revenge
+  "Every session I log is a rep of revenge. Not on people — on the version of me they bet against.",
+  // 6. Emotional fuel
+  "Their doubt is the cleanest fuel I've ever used. I don't waste it. I burn it slowly, deliberately.",
+  // 7. Identity shift
+  "I am becoming so capable, so sharp, so relentless — that my success will feel personal to them. Good.",
+  // 8. Quiet confidence
+  "I don't need to announce it. When the results arrive, anyone who wanted me to fail will feel it.",
+  // 9. Work ethic angle
+  "While they were counting me out, I was counting reps. The gap between us grows every single day.",
+  // 10. The spectator effect
+  "Nothing is more uncomfortable for an enemy than watching you win with complete peace on your face.",
+  // 11. Legacy angle
+  "I'm building a body of work so strong that everyone who dismissed me becomes a footnote in my story.",
+  // 12. Contrast reframe
+  "They wanted chaos. I gave them consistency. They wanted my breakdown. I gave them my breakthrough.",
+  // 13. Compound interest
+  "Every hour I practice is interest on a debt they don't know they owe me. It compounds daily.",
+  // 14. Cold math
+  "This is simple math. The better I get, the worse it feels for anyone who bet on my failure.",
+  // 15. Visibility
+  "I used to want to hide my progress. Now I log it publicly. Let them watch every milestone land.",
+  // 16. Purpose reframe
+  "I'm not doing this for validation. I'm doing this so thoroughly that validation becomes irrelevant.",
+  // 17. The unbothered angle
+  "The most devastating thing I can do to someone who hates me is live an extraordinary life, calmly.",
+  // 18. Time
+  "Time is on my side as long as I keep showing up. Every day I practice is a day they fall behind.",
+  // 19. Mastery as statement
+  "Mastery is the most personal statement I can make. No words needed. The skill speaks for itself.",
+  // 20. The full circle
+  "One day I'll be too far ahead for their hate to reach me. I'm building that distance rep by rep.",
 ]
 
 const TYPE_ICONS: Record<MotivationEntry['type'], any> = {
@@ -113,15 +134,12 @@ export default function MotivationVault({ userId }: Props) {
     setContent(text)
     setActiveType('proof_them_wrong')
     setShowAdd(true)
-    // Scroll to form
     setTimeout(() => document.getElementById('vault-add-form')?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
 
   const pinned = entries.filter(e => e.is_pinned)
   const unpinned = entries.filter(e => !e.is_pinned)
   const spotlight = entries[spotlightIndex]
-
-  // Starters to show: 6 by default, all 20 when expanded
   const visibleStarters = showAllStarters ? PROOF_STARTERS : PROOF_STARTERS.slice(0, 6)
 
   if (loading) return (
@@ -157,7 +175,6 @@ export default function MotivationVault({ userId }: Props) {
           </div>
         </div>
       ) : (
-        // Empty state — full starters list
         <div className="bg-gradient-to-br from-orange-950/40 to-red-950/30 border border-orange-800/30 rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-1">
             <Flame className="w-5 h-5 text-orange-400" />
@@ -194,10 +211,7 @@ export default function MotivationVault({ userId }: Props) {
             const count = entries.filter(e => e.type === t).length
             if (count === 0) return null
             return (
-              <button
-                key={t}
-                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-xl text-xs text-gray-400 transition-colors"
-              >
+              <button key={t} className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-xl text-xs text-gray-400 transition-colors">
                 <span>{VAULT_TYPES[t].emoji}</span>
                 <span>{VAULT_TYPES[t].label}</span>
                 <span className="bg-gray-700 text-gray-500 rounded-full w-4 h-4 flex items-center justify-center text-[10px]">{count}</span>
@@ -223,12 +237,12 @@ export default function MotivationVault({ userId }: Props) {
         </div>
       )}
 
-      {/* Quick-add starters panel (shown when vault has entries) */}
+      {/* Quick-add starters panel */}
       {entries.length > 0 && (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <Flame className="w-4 h-4 text-orange-400" />
-            <p className="text-gray-400 text-xs font-medium">Quick-add starters ({PROOF_STARTERS.length} available)</p>
+            <p className="text-gray-400 text-xs font-medium">Quick-add fuel ({PROOF_STARTERS.length} statements)</p>
           </div>
           <div className="space-y-1.5">
             {visibleStarters.map((s, i) => (
@@ -263,9 +277,7 @@ export default function MotivationVault({ userId }: Props) {
                 key={t}
                 onClick={() => { setActiveType(t); setContent(VAULT_TYPES[t].placeholder) }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all ${
-                  activeType === t
-                    ? 'text-white ring-1'
-                    : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                  activeType === t ? 'text-white ring-1' : 'bg-gray-800 text-gray-500 hover:text-gray-300'
                 }`}
                 style={activeType === t ? { backgroundColor: TYPE_COLORS[t] + '33', ringColor: TYPE_COLORS[t], color: TYPE_COLORS[t] } : {}}
               >
