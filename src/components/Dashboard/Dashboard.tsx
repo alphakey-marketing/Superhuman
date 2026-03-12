@@ -11,12 +11,45 @@ interface Props {
   userId: string
 }
 
+// High-contrast tooltip used by both charts
 const TOOLTIP_STYLE = {
-  backgroundColor: '#1f2937',
-  border: '1px solid #374151',
-  borderRadius: '12px',
-  color: '#f9fafb',
-  fontSize: '12px',
+  backgroundColor: '#0f172a',
+  border: '1px solid #6366f1',
+  borderRadius: '10px',
+  color: '#f1f5f9',
+  fontSize: '13px',
+  fontWeight: '600',
+  padding: '8px 12px',
+  boxShadow: '0 4px 24px rgba(0,0,0,0.6)',
+}
+
+const TOOLTIP_LABEL_STYLE = {
+  color: '#a5b4fc',
+  fontWeight: '700',
+  marginBottom: '2px',
+}
+
+// Custom pie tooltip for clear category + hours display
+function PieTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null
+  const { name, value, payload: { color } } = payload[0]
+  return (
+    <div style={{
+      backgroundColor: '#0f172a',
+      border: `1.5px solid ${color}`,
+      borderRadius: '10px',
+      padding: '8px 14px',
+      boxShadow: '0 4px 24px rgba(0,0,0,0.7)',
+    }}>
+      <div className="flex items-center gap-2">
+        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+        <span style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '13px' }}>{name}</span>
+      </div>
+      <p style={{ color: '#a5b4fc', fontWeight: 600, fontSize: '13px', marginTop: '2px' }}>
+        {value}h allocated
+      </p>
+    </div>
+  )
 }
 
 export default function Dashboard({ userId }: Props) {
@@ -45,10 +78,8 @@ export default function Dashboard({ userId }: Props) {
     fetchData()
   }, [userId])
 
-  // Pie
   const pieData = budgets.map(b => ({ name: b.category, value: b.hours_allocated, color: b.color }))
 
-  // Weekly line chart
   const weeklyData = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(Date.now() - (6 - i) * 86400000)
     const dateStr = d.toISOString().split('T')[0]
@@ -62,7 +93,6 @@ export default function Dashboard({ userId }: Props) {
     }
   })
 
-  // Today's stats
   const today = new Date().toISOString().split('T')[0]
   const todaySessions = sessions.filter(
     s => s.started_at.startsWith(today) && s.status === 'completed'
@@ -71,7 +101,6 @@ export default function Dashboard({ userId }: Props) {
   const totalDistractions = todaySessions.reduce((sum, s) => sum + s.distractions_count, 0)
   const completedCycles = todaySessions.reduce((sum, s) => sum + s.completed_cycles, 0)
 
-  // Focus score: penalise by distractions
   const focusScore = focusMinutes > 0
     ? Math.max(0, Math.round(100 - (totalDistractions / Math.max(completedCycles, 1)) * 20))
     : 0
@@ -145,20 +174,19 @@ export default function Dashboard({ userId }: Props) {
                     innerRadius={52} outerRadius={76}
                     dataKey="value"
                     paddingAngle={3}
+                    strokeWidth={0}
                   >
                     {pieData.map((entry, i) => (
                       <Cell key={i} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip
-                    formatter={(v: number) => [`${v}h`, '']}
-                    contentStyle={TOOLTIP_STYLE}
-                  />
+                  {/* Custom tooltip component for high contrast */}
+                  <Tooltip content={<PieTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center">
+              <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center mt-1">
                 {pieData.map(d => (
-                  <div key={d.name} className="flex items-center gap-1 text-xs text-gray-400">
+                  <div key={d.name} className="flex items-center gap-1 text-xs text-gray-300">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
                     {d.name}
                   </div>
@@ -180,12 +208,17 @@ export default function Dashboard({ userId }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
               <XAxis dataKey="day" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} />
+              <Tooltip
+                contentStyle={TOOLTIP_STYLE}
+                labelStyle={TOOLTIP_LABEL_STYLE}
+                formatter={(v: number) => [`${v}h`, 'Focus']}
+                cursor={{ stroke: '#6366f1', strokeWidth: 1, strokeDasharray: '4 4' }}
+              />
               <Line
                 type="monotone" dataKey="focusHours"
                 stroke="#6366f1" strokeWidth={2.5}
                 dot={{ fill: '#6366f1', r: 4 }}
-                activeDot={{ r: 6 }}
+                activeDot={{ r: 6, fill: '#818cf8' }}
                 name="Focus hrs"
               />
             </LineChart>
@@ -193,7 +226,6 @@ export default function Dashboard({ userId }: Props) {
         </div>
       </div>
 
-      {/* Streak / tips */}
       {focusScore === 0 && (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 text-center">
           <p className="text-gray-400 text-sm">Start a Pomodoro session to see your daily focus score here 🎯</p>
