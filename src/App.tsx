@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Brain, LayoutDashboard, Target, Timer, LogOut, Menu, X, BarChart2, Leaf } from 'lucide-react'
+import { Brain, LayoutDashboard, Target, Timer, LogOut, Menu, X, BarChart2, Leaf, Dumbbell, Flame } from 'lucide-react'
 import { useAuth } from './hooks/useAuth'
 import { useDistraction } from './hooks/useDistraction'
 import LoginForm from './components/Auth/LoginForm'
@@ -9,15 +9,19 @@ import Dashboard from './components/Dashboard/Dashboard'
 import DistractionTracker from './components/Analytics/DistractionTracker'
 import StreakWidget from './components/Analytics/StreakWidget'
 import RestorationBreak from './components/Breaks/RestorationBreak'
+import PracticeTracker from './components/Practice/PracticeTracker'
+import MotivationVault from './components/Practice/MotivationVault'
 import UATBanner from './components/UATBanner'
 
-type Tab = 'dashboard' | 'budget' | 'pomodoro' | 'analytics'
+type Tab = 'dashboard' | 'budget' | 'pomodoro' | 'analytics' | 'practice' | 'vault'
 
 const tabs = [
-  { id: 'dashboard'  as Tab, label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'budget'     as Tab, label: 'Planner',   icon: Target },
-  { id: 'pomodoro'   as Tab, label: 'Timer',     icon: Timer },
-  { id: 'analytics'  as Tab, label: 'Analytics', icon: BarChart2 },
+  { id: 'dashboard' as Tab, label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'budget'    as Tab, label: 'Planner',   icon: Target },
+  { id: 'pomodoro'  as Tab, label: 'Timer',     icon: Timer },
+  { id: 'analytics' as Tab, label: 'Analytics', icon: BarChart2 },
+  { id: 'practice'  as Tab, label: 'Practice',  icon: Dumbbell },
+  { id: 'vault'     as Tab, label: 'Vault',     icon: Flame },
 ]
 
 export default function App() {
@@ -32,7 +36,6 @@ export default function App() {
     weekday: 'long', month: 'short', day: 'numeric',
   })
 
-  // Auto-track tab switches as distractions during focus sessions
   useDistraction(user?.id, pomodoroRunning)
 
   if (loading) {
@@ -66,7 +69,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Restoration break button — always accessible */}
             <button
               onClick={() => setShowBreak(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-800/40 text-emerald-400 text-xs rounded-lg transition-colors"
@@ -74,7 +76,6 @@ export default function App() {
               <Leaf className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Break</span>
             </button>
-
             <button
               onClick={() => signOut()}
               className="hidden sm:flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-xs transition-colors px-2 py-1 rounded-lg hover:bg-gray-800"
@@ -108,16 +109,16 @@ export default function App() {
         )}
       </header>
 
-      {/* Tab bar */}
-      <nav className="border-b border-gray-800 bg-gray-950 sticky top-[57px] z-40">
-        <div className="max-w-2xl mx-auto px-4 flex gap-1">
+      {/* Tab bar — scrollable on mobile for 6 tabs */}
+      <nav className="border-b border-gray-800 bg-gray-950 sticky top-[57px] z-40 overflow-x-auto scrollbar-hide">
+        <div className="max-w-2xl mx-auto px-4 flex gap-0.5 min-w-max sm:min-w-0">
           {tabs.map(tab => {
             const Icon = tab.icon
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-3 py-3 text-sm border-b-2 transition-all font-medium ${
+                className={`flex items-center gap-1.5 px-3 py-3 text-sm border-b-2 transition-all font-medium whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'border-indigo-500 text-white'
                     : 'border-transparent text-gray-500 hover:text-gray-300'
@@ -160,10 +161,7 @@ export default function App() {
               <h2 className="text-xl font-bold text-white">Focus Timer</h2>
               <p className="text-gray-500 text-sm mt-0.5">25-5 Pomodoro with distraction logging</p>
             </div>
-            <PomodoroTimer
-              userId={user.id}
-              onRunningChange={setPomodoroRunning}
-            />
+            <PomodoroTimer userId={user.id} onRunningChange={setPomodoroRunning} />
           </>
         )}
         {activeTab === 'analytics' && (
@@ -175,14 +173,28 @@ export default function App() {
             <DistractionTracker userId={user.id} />
           </>
         )}
+        {activeTab === 'practice' && (
+          <>
+            <div className="mb-5">
+              <h2 className="text-xl font-bold text-white">Deliberate Practice</h2>
+              <p className="text-gray-500 text-sm mt-0.5">Track mastery. Every hour compounds.</p>
+            </div>
+            <PracticeTracker userId={user.id} />
+          </>
+        )}
+        {activeTab === 'vault' && (
+          <>
+            <div className="mb-5">
+              <h2 className="text-xl font-bold text-white">Motivation Vault</h2>
+              <p className="text-gray-500 text-sm mt-0.5">Your fuel. Your proof. Your fire.</p>
+            </div>
+            <MotivationVault userId={user.id} />
+          </>
+        )}
       </main>
 
-      {/* Restoration break modal */}
       {showBreak && user && (
-        <RestorationBreak
-          userId={user.id}
-          onClose={() => setShowBreak(false)}
-        />
+        <RestorationBreak userId={user.id} onClose={() => setShowBreak(false)} />
       )}
     </div>
   )
