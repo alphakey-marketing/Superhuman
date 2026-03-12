@@ -20,3 +20,9 @@ externalPort = 80
 
 [agent]
 expertMode = true
+
+[userenv]
+
+[userenv.shared]
+VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvanZla2docHdjeWtycWt3dmh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNjA2MzgsImV4cCI6MjA4ODgzNjYzOH0.2tfn79uCicBYRiwicXei68Sa84vi0UonRwlvxfjZwlI"
+VITE_SUPABASE_URL = "https://kojvekghpwcykrqkwvhy.supabase.co"
