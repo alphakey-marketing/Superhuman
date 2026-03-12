@@ -18,6 +18,14 @@ publicDir = "dist"
 localPort = 5173
 externalPort = 80
 
+[[ports]]
+localPort = 5174
+externalPort = 3000
+
+[[ports]]
+localPort = 5175
+externalPort = 3001
+
 [agent]
 expertMode = true
 
@@ -26,3 +34,4 @@ expertMode = true
 [userenv.shared]
 VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtvanZla2docHdjeWtycWt3dmh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNjA2MzgsImV4cCI6MjA4ODgzNjYzOH0.2tfn79uCicBYRiwicXei68Sa84vi0UonRwlvxfjZwlI"
 VITE_SUPABASE_URL = "https://kojvekghpwcykrqkwvhy.supabase.co"
+VITE_UAT_MODE = "true"
