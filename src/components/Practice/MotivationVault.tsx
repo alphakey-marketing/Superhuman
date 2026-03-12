@@ -5,48 +5,26 @@ import { MotivationEntry, VAULT_TYPES } from '../../types'
 
 interface Props { userId: string }
 
-// 20 statements — core theme: "I will get so good that people who want me to fail will be miserable"
-// Each from a different angle / perspective / emotional tone
 const PROOF_STARTERS = [
-  // 1. Cold obsession
   "I will get so good at this that the people who wanted me to fail won't be able to sleep at night.",
-  // 2. Silence as weapon
   "I stopped arguing. I started compounding. Every skill I stack is a sentence they can't finish.",
-  // 3. The irony angle
   "The funniest thing I'll ever do is become exactly what they said I'd never be — in front of them.",
-  // 4. Long game
   "They celebrated my early failures. I'm building something so undeniable it'll haunt them for years.",
-  // 5. Discipline as revenge
   "Every session I log is a rep of revenge. Not on people — on the version of me they bet against.",
-  // 6. Emotional fuel
   "Their doubt is the cleanest fuel I've ever used. I don't waste it. I burn it slowly, deliberately.",
-  // 7. Identity shift
   "I am becoming so capable, so sharp, so relentless — that my success will feel personal to them. Good.",
-  // 8. Quiet confidence
   "I don't need to announce it. When the results arrive, anyone who wanted me to fail will feel it.",
-  // 9. Work ethic angle
   "While they were counting me out, I was counting reps. The gap between us grows every single day.",
-  // 10. The spectator effect
   "Nothing is more uncomfortable for an enemy than watching you win with complete peace on your face.",
-  // 11. Legacy angle
   "I'm building a body of work so strong that everyone who dismissed me becomes a footnote in my story.",
-  // 12. Contrast reframe
   "They wanted chaos. I gave them consistency. They wanted my breakdown. I gave them my breakthrough.",
-  // 13. Compound interest
   "Every hour I practice is interest on a debt they don't know they owe me. It compounds daily.",
-  // 14. Cold math
   "This is simple math. The better I get, the worse it feels for anyone who bet on my failure.",
-  // 15. Visibility
   "I used to want to hide my progress. Now I log it publicly. Let them watch every milestone land.",
-  // 16. Purpose reframe
   "I'm not doing this for validation. I'm doing this so thoroughly that validation becomes irrelevant.",
-  // 17. The unbothered angle
   "The most devastating thing I can do to someone who hates me is live an extraordinary life, calmly.",
-  // 18. Time
   "Time is on my side as long as I keep showing up. Every day I practice is a day they fall behind.",
-  // 19. Mastery as statement
   "Mastery is the most personal statement I can make. No words needed. The skill speaks for itself.",
-  // 20. The full circle
   "One day I'll be too far ahead for their hate to reach me. I'm building that distance rep by rep.",
 ]
 
@@ -277,9 +255,13 @@ export default function MotivationVault({ userId }: Props) {
                 key={t}
                 onClick={() => { setActiveType(t); setContent(VAULT_TYPES[t].placeholder) }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all ${
-                  activeType === t ? 'text-white ring-1' : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                  activeType === t ? 'text-white' : 'bg-gray-800 text-gray-500 hover:text-gray-300'
                 }`}
-                style={activeType === t ? { backgroundColor: TYPE_COLORS[t] + '33', ringColor: TYPE_COLORS[t], color: TYPE_COLORS[t] } : {}}
+                style={activeType === t ? {
+                  backgroundColor: TYPE_COLORS[t] + '33',
+                  color: TYPE_COLORS[t],
+                  boxShadow: `0 0 0 1px ${TYPE_COLORS[t]}`,
+                } : {}}
               >
                 {VAULT_TYPES[t].emoji} {VAULT_TYPES[t].label}
               </button>
