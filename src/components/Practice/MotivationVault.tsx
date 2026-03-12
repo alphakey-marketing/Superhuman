@@ -1,22 +1,32 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Pin, Flame, Crown, Diamond, Trophy, PenLine, Shuffle } from 'lucide-react'
+import { Plus, Trash2, Pin, Flame, Crown, Diamond, Trophy, PenLine, Shuffle, ChevronDown, ChevronUp } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { MotivationEntry, VAULT_TYPES } from '../../types'
 
 interface Props { userId: string }
 
-// Pre-loaded "Prove Them Wrong" starter statements
+// 20 "Prove Them Wrong" starter statements
 const PROOF_STARTERS = [
   "They said I couldn't. Every rep I do proves them wrong.",
   "The ones who doubted me are the ones watching now.",
   "I don't need your belief. I have my own.",
-  "Underestimated. Underpaid. Underestimated. Watch.",
+  "Underestimated. Overlooked. Unstoppable. Watch.",
   "Every hour I log is a letter to everyone who wrote me off.",
   "They saw the ceiling. I saw the starting line.",
   "Quiet. Build. Let the results be loud.",
   "The best revenge is an extraordinary life.",
   "I'm not doing this to prove you wrong. I'm doing it to prove myself right.",
   "They said it was too late. I said watch me.",
+  "Nobody believed in the version of me I'm becoming. That's fine.",
+  "I was counted out. I'm still counting.",
+  "The doubters gave me the most powerful fuel I've ever had.",
+  "Average was never my destination. I just had to leave.",
+  "They laughed at the plan. They'll respect the result.",
+  "My consistency is the argument. I let it speak.",
+  "One day they'll ask how I did it. I'll say: I never stopped.",
+  "Every morning I wake up is another day they're wrong.",
+  "I don't need a crowd. I need a calendar and a goal.",
+  "The gap between who I was and who I'm becoming — that's my proof.",
 ]
 
 const TYPE_ICONS: Record<MotivationEntry['type'], any> = {
@@ -51,10 +61,9 @@ export default function MotivationVault({ userId }: Props) {
   const [content, setContent] = useState('')
   const [spotlightIndex, setSpotlightIndex] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [showAllStarters, setShowAllStarters] = useState(false)
 
-  useEffect(() => {
-    load()
-  }, [userId])
+  useEffect(() => { load() }, [userId])
 
   const load = async () => {
     const { data } = await supabase
@@ -104,11 +113,16 @@ export default function MotivationVault({ userId }: Props) {
     setContent(text)
     setActiveType('proof_them_wrong')
     setShowAdd(true)
+    // Scroll to form
+    setTimeout(() => document.getElementById('vault-add-form')?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
 
   const pinned = entries.filter(e => e.is_pinned)
   const unpinned = entries.filter(e => !e.is_pinned)
   const spotlight = entries[spotlightIndex]
+
+  // Starters to show: 6 by default, all 20 when expanded
+  const visibleStarters = showAllStarters ? PROOF_STARTERS : PROOF_STARTERS.slice(0, 6)
 
   if (loading) return (
     <div className="flex items-center justify-center h-40">
@@ -119,14 +133,14 @@ export default function MotivationVault({ userId }: Props) {
   return (
     <div className="space-y-5">
 
-      {/* Spotlight card — shows a random entry in full */}
+      {/* Spotlight card */}
       {spotlight ? (
         <div className={`bg-gradient-to-br ${TYPE_BG[spotlight.type]} border rounded-2xl p-5 relative overflow-hidden`}>
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl opacity-10" style={{ backgroundColor: TYPE_COLORS[spotlight.type] }} />
           <div className="flex items-start justify-between gap-3 relative">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-3">
-                {(() => { const Icon = TYPE_ICONS[spotlight.type]; return <Icon className="w-4 h-4" style={{ color: TYPE_COLORS[spotlight.type] }} /> })()} 
+                {(() => { const Icon = TYPE_ICONS[spotlight.type]; return <Icon className="w-4 h-4" style={{ color: TYPE_COLORS[spotlight.type] }} /> })()}
                 <span className="text-xs font-medium" style={{ color: TYPE_COLORS[spotlight.type] }}>
                   {VAULT_TYPES[spotlight.type].emoji} {VAULT_TYPES[spotlight.type].label}
                 </span>
@@ -143,15 +157,15 @@ export default function MotivationVault({ userId }: Props) {
           </div>
         </div>
       ) : (
-        // Empty state — show proof them wrong starters
+        // Empty state — full starters list
         <div className="bg-gradient-to-br from-orange-950/40 to-red-950/30 border border-orange-800/30 rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-1">
             <Flame className="w-5 h-5 text-orange-400" />
             <p className="text-white font-semibold">Prove Them Wrong</p>
           </div>
-          <p className="text-gray-400 text-sm mb-4">Tap a statement to add it to your vault:</p>
+          <p className="text-gray-400 text-sm mb-4">Tap any statement to add it to your vault:</p>
           <div className="space-y-2">
-            {PROOF_STARTERS.slice(0, 4).map((s, i) => (
+            {visibleStarters.map((s, i) => (
               <button
                 key={i}
                 onClick={() => useStarter(s)}
@@ -161,6 +175,15 @@ export default function MotivationVault({ userId }: Props) {
               </button>
             ))}
           </div>
+          <button
+            onClick={() => setShowAllStarters(v => !v)}
+            className="mt-3 w-full flex items-center justify-center gap-1.5 text-orange-400/70 hover:text-orange-400 text-xs transition-colors py-1.5"
+          >
+            {showAllStarters
+              ? <><ChevronUp className="w-3.5 h-3.5" /> Show less</>
+              : <><ChevronDown className="w-3.5 h-3.5" /> Show all {PROOF_STARTERS.length} statements</>
+            }
+          </button>
         </div>
       )}
 
@@ -200,27 +223,39 @@ export default function MotivationVault({ userId }: Props) {
         </div>
       )}
 
-      {/* Proof them wrong starters (if has entries) */}
+      {/* Quick-add starters panel (shown when vault has entries) */}
       {entries.length > 0 && (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
-          <p className="text-gray-400 text-xs mb-3">🔥 Quick-add starters:</p>
+          <div className="flex items-center gap-2 mb-3">
+            <Flame className="w-4 h-4 text-orange-400" />
+            <p className="text-gray-400 text-xs font-medium">Quick-add starters ({PROOF_STARTERS.length} available)</p>
+          </div>
           <div className="space-y-1.5">
-            {PROOF_STARTERS.slice(0, 5).map((s, i) => (
+            {visibleStarters.map((s, i) => (
               <button
                 key={i}
                 onClick={() => useStarter(s)}
                 className="w-full text-left text-xs text-gray-500 hover:text-gray-300 px-2 py-1.5 rounded-lg hover:bg-gray-800 transition-colors"
               >
-                + "{s.slice(0, 60)}{s.length > 60 ? '...' : ''}"
+                + "{s.slice(0, 72)}{s.length > 72 ? '...' : ''}"
               </button>
             ))}
           </div>
+          <button
+            onClick={() => setShowAllStarters(v => !v)}
+            className="mt-2 w-full flex items-center justify-center gap-1.5 text-gray-600 hover:text-gray-400 text-xs transition-colors py-1"
+          >
+            {showAllStarters
+              ? <><ChevronUp className="w-3 h-3" /> Show less</>
+              : <><ChevronDown className="w-3 h-3" /> Show all {PROOF_STARTERS.length}</>
+            }
+          </button>
         </div>
       )}
 
       {/* Add entry form */}
       {showAdd ? (
-        <div className="bg-gray-900 border border-indigo-800/40 rounded-2xl p-4 space-y-3">
+        <div id="vault-add-form" className="bg-gray-900 border border-indigo-800/40 rounded-2xl p-4 space-y-3">
           <p className="text-white font-medium text-sm">Add to Vault</p>
           <div className="flex gap-1.5 flex-wrap">
             {(Object.keys(VAULT_TYPES) as MotivationEntry['type'][]).map(t => (
