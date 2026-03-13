@@ -20,12 +20,12 @@ type Tab = 'dashboard' | 'budget' | 'pomodoro' | 'analytics' | 'practice' | 'vau
 const ONBOARDING_KEY = 'attentionos_onboarded_v1'
 
 const tabs = [
-  { id: 'dashboard' as Tab, label: 'Home',     shortLabel: 'Home',     icon: LayoutDashboard },
-  { id: 'budget'    as Tab, label: 'Planner',  shortLabel: 'Plan',     icon: Target },
-  { id: 'pomodoro'  as Tab, label: 'Timer',    shortLabel: 'Timer',    icon: Timer },
-  { id: 'analytics' as Tab, label: 'Analytics',shortLabel: 'Stats',    icon: BarChart2 },
-  { id: 'practice'  as Tab, label: 'Practice', shortLabel: 'Train',    icon: Dumbbell },
-  { id: 'vault'     as Tab, label: 'Vault',    shortLabel: 'Vault',    icon: Flame },
+  { id: 'dashboard' as Tab, label: 'Home',      shortLabel: 'Home',  icon: LayoutDashboard },
+  { id: 'budget'    as Tab, label: 'Planner',   shortLabel: 'Plan',  icon: Target },
+  { id: 'pomodoro'  as Tab, label: 'Timer',     shortLabel: 'Timer', icon: Timer },
+  { id: 'analytics' as Tab, label: 'Analytics', shortLabel: 'Stats', icon: BarChart2 },
+  { id: 'practice'  as Tab, label: 'Practice',  shortLabel: 'Train', icon: Dumbbell },
+  { id: 'vault'     as Tab, label: 'Vault',     shortLabel: 'Vault', icon: Flame },
 ]
 
 export default function App() {
@@ -36,24 +36,23 @@ export default function App() {
   const [pomodoroRunning, setPomodoroRunning] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
-  // Practice / session quick-start status (lifted from children via local check)
   const [hasBudget, setHasBudget] = useState(false)
   const [hasSessions, setHasSessions] = useState(false)
   const [hasSkills, setHasSkills] = useState(false)
 
+  // Single source of truth for today's date string — passed to both
+  // BudgetPlanner and PomodoroTimer so their Supabase queries always match.
   const today = new Date().toISOString().split('T')[0]
   const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
 
   useDistraction(user?.id, pomodoroRunning)
 
-  // Show onboarding modal on first ever login
   useEffect(() => {
     if (user && !localStorage.getItem(ONBOARDING_KEY)) {
       setShowOnboarding(true)
     }
   }, [user])
 
-  // Check quick-start status
   useEffect(() => {
     if (!user) return
     const check = async () => {
@@ -92,7 +91,6 @@ export default function App() {
     <div className="min-h-screen bg-gray-950 flex flex-col">
       <UATBanner />
 
-      {/* Welcome onboarding modal — shows once */}
       {showOnboarding && <WelcomeModal onDone={handleOnboardingDone} />}
 
       {/* Header */}
@@ -138,7 +136,7 @@ export default function App() {
         )}
       </header>
 
-      {/* Tab bar — labels always visible, scrollable */}
+      {/* Tab bar */}
       <nav className="border-b border-gray-800 bg-gray-950 sticky top-[57px] z-40 overflow-x-auto scrollbar-hide">
         <div className="max-w-2xl mx-auto px-2 flex">
           {tabs.map(tab => {
@@ -161,6 +159,7 @@ export default function App() {
 
       {/* Main content */}
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 pb-12">
+
         {activeTab === 'dashboard' && (
           <>
             <div className="mb-5">
@@ -179,6 +178,7 @@ export default function App() {
             </div>
           </>
         )}
+
         {activeTab === 'budget' && (
           <>
             <div className="mb-3">
@@ -193,6 +193,7 @@ export default function App() {
             <BudgetPlanner userId={user.id} date={today} />
           </>
         )}
+
         {activeTab === 'pomodoro' && (
           <>
             <div className="mb-3 text-center">
@@ -204,9 +205,13 @@ export default function App() {
                 💡 <strong>How this works:</strong> Work in 25-min blocks. No phone, no tabs. If you get distracted, tap ⚠️ to log it — awareness is how you improve. Take a 🌿 break after each cycle.
               </p>
             </div>
-            <PomodoroTimer userId={user.id} onRunningChange={setPomodoroRunning} />
+            {/* date={today} is critical — without it, PomodoroTimer's Supabase
+                query uses undefined and always returns 0 budget rows, causing
+                the "no plan" warning even after the user set one in Planner. */}
+            <PomodoroTimer userId={user.id} date={today} onRunningChange={setPomodoroRunning} />
           </>
         )}
+
         {activeTab === 'analytics' && (
           <>
             <div className="mb-3">
@@ -221,6 +226,7 @@ export default function App() {
             <DistractionTracker userId={user.id} />
           </>
         )}
+
         {activeTab === 'practice' && (
           <>
             <div className="mb-3">
@@ -235,6 +241,7 @@ export default function App() {
             <PracticeTracker userId={user.id} />
           </>
         )}
+
         {activeTab === 'vault' && (
           <>
             <div className="mb-3">
@@ -249,6 +256,7 @@ export default function App() {
             <MotivationVault userId={user.id} />
           </>
         )}
+
       </main>
 
       {showBreak && user && (
