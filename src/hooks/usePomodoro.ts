@@ -9,6 +9,10 @@ interface PomodoroState {
   cycles: number
   distractions: number
   taskLabel: string
+  // The budget category the user is working on (e.g. "Deep Work", "Admin")
+  budgetCategory: string | null
+  // The Supabase row id of the matching attention_budget so we can increment hours_used
+  budgetRowId: string | null
   sessionId: string | null
 }
 
@@ -19,7 +23,7 @@ type PomodoroAction =
   | { type: 'SET_TIME_LEFT'; timeLeft: number }
   | { type: 'NEXT_MODE'; mode: PomodoroMode }
   | { type: 'ADD_DISTRACTION' }
-  | { type: 'SET_TASK'; label: string }
+  | { type: 'SET_TASK'; label: string; budgetCategory: string | null; budgetRowId: string | null }
   | { type: 'SET_SESSION_ID'; id: string }
 
 function reducer(state: PomodoroState, action: PomodoroAction): PomodoroState {
@@ -49,7 +53,12 @@ function reducer(state: PomodoroState, action: PomodoroAction): PomodoroState {
     case 'ADD_DISTRACTION':
       return { ...state, distractions: state.distractions + 1 }
     case 'SET_TASK':
-      return { ...state, taskLabel: action.label }
+      return {
+        ...state,
+        taskLabel: action.label,
+        budgetCategory: action.budgetCategory,
+        budgetRowId: action.budgetRowId,
+      }
     case 'SET_SESSION_ID':
       return { ...state, sessionId: action.id }
     default:
@@ -57,7 +66,6 @@ function reducer(state: PomodoroState, action: PomodoroAction): PomodoroState {
   }
 }
 
-// Beep sound on completion
 function beep() {
   try {
     const ctx = new AudioContext()
@@ -73,7 +81,6 @@ function beep() {
   } catch (_) {}
 }
 
-// Web Notification -- fires even when the tab is backgrounded or phone screen is off
 function notify(title: string, body: string) {
   if (!('Notification' in window)) return
   const fire = () => new Notification(title, { body, icon: '/favicon.ico', tag: 'pomodoro' })
@@ -92,21 +99,17 @@ export function usePomodoro(userId: string | undefined) {
     cycles: 0,
     distractions: 0,
     taskLabel: '',
+    budgetCategory: null,
+    budgetRowId: null,
     sessionId: null,
   })
 
-  const timerRef            = useRef<ReturnType<typeof setInterval> | null>(null)
-  const stateRef            = useRef(state)
-  stateRef.current          = state
+  const timerRef             = useRef<ReturnType<typeof setInterval> | null>(null)
+  const stateRef             = useRef(state)
+  stateRef.current           = state
+  const startEpochRef        = useRef<number | null>(null)
+  const elapsedAtPauseRef    = useRef<number>(0)
 
-  // Wall-clock timestamp (ms) at which the current run segment started.
-  // KEY FIX: we compute timeLeft = duration - elapsed_wall_clock, so browser
-  // throttling of setInterval does NOT affect accuracy.
-  const startEpochRef       = useRef<number | null>(null)
-  // Seconds already counted before the last pause (accumulated across pauses).
-  const elapsedAtPauseRef   = useRef<number>(0)
-
-  // -- Completion handler --
   const handleComplete = useCallback(async () => {
     const s = stateRef.current
     dispatch({ type: 'PAUSE' })
@@ -131,8 +134,24 @@ export function usePomodoro(userId: string | undefined) {
           completed_cycles: newCycles,
           distractions_count: s.distractions,
           status: 'completed',
+          budget_category: s.budgetCategory,
         })
         .eq('id', s.sessionId)
+    }
+
+    // Auto-increment hours_used on the linked budget row (25 min = 25/60 h)
+    if (s.mode === 'focus' && s.budgetRowId) {
+      const { data: row } = await supabase
+        .from('attention_budgets')
+        .select('hours_used')
+        .eq('id', s.budgetRowId)
+        .single()
+      if (row) {
+        await supabase
+          .from('attention_budgets')
+          .update({ hours_used: Math.round((row.hours_used + 25 / 60) * 100) / 100 })
+          .eq('id', s.budgetRowId)
+      }
     }
 
     if (s.mode === 'focus') {
@@ -144,10 +163,6 @@ export function usePomodoro(userId: string | undefined) {
     }
   }, [userId])
 
-  // -- Wall-clock sync: recompute timeLeft from actual elapsed time --
-  // Called every 500ms AND on visibilitychange, so returning to the tab
-  // instantly snaps the display to the correct value regardless of how
-  // long the browser had throttled the interval.
   const computeAndSync = useCallback(() => {
     if (!stateRef.current.isRunning || startEpochRef.current === null) return
     const totalDuration = POMODORO_DURATIONS[stateRef.current.mode]
@@ -161,16 +176,12 @@ export function usePomodoro(userId: string | undefined) {
     }
   }, [handleComplete])
 
-  // -- Start / stop interval --
   useEffect(() => {
     if (state.isRunning) {
-      if (startEpochRef.current === null) {
-        startEpochRef.current = Date.now()
-      }
+      if (startEpochRef.current === null) startEpochRef.current = Date.now()
       timerRef.current = setInterval(computeAndSync, 500)
     } else {
       if (timerRef.current) clearInterval(timerRef.current)
-      // Accumulate elapsed time so resume is accurate after a pause
       if (startEpochRef.current !== null) {
         elapsedAtPauseRef.current += Math.floor((Date.now() - startEpochRef.current) / 1000)
         startEpochRef.current = null
@@ -179,7 +190,6 @@ export function usePomodoro(userId: string | undefined) {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [state.isRunning, computeAndSync])
 
-  // -- Visibility change: snap to correct time the moment user returns to tab --
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') computeAndSync()
@@ -188,13 +198,11 @@ export function usePomodoro(userId: string | undefined) {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [computeAndSync])
 
-  // -- Reset elapsed tracking when mode changes --
   useEffect(() => {
     startEpochRef.current     = null
     elapsedAtPauseRef.current = 0
   }, [state.mode])
 
-  // -- Public actions --
   const start = useCallback(async () => {
     dispatch({ type: 'START' })
     if (!stateRef.current.sessionId && userId) {
@@ -203,6 +211,7 @@ export function usePomodoro(userId: string | undefined) {
         .insert({
           user_id: userId,
           task_label: stateRef.current.taskLabel || null,
+          budget_category: stateRef.current.budgetCategory || null,
         })
         .select()
         .single()
@@ -223,6 +232,14 @@ export function usePomodoro(userId: string | undefined) {
     dispatch({ type: 'RESET' })
   }, [])
 
+  const setTask = useCallback((
+    label: string,
+    budgetCategory: string | null = null,
+    budgetRowId: string | null = null
+  ) => {
+    dispatch({ type: 'SET_TASK', label, budgetCategory, budgetRowId })
+  }, [])
+
   return {
     state,
     start,
@@ -230,7 +247,7 @@ export function usePomodoro(userId: string | undefined) {
     reset: () => dispatch({ type: 'RESET' }),
     abandon,
     addDistraction: () => dispatch({ type: 'ADD_DISTRACTION' }),
-    setTask: (label: string) => dispatch({ type: 'SET_TASK', label }),
+    setTask,
     switchMode: (mode: PomodoroMode) => dispatch({ type: 'NEXT_MODE', mode }),
   }
 }

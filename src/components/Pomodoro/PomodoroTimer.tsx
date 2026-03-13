@@ -1,10 +1,12 @@
-import { useState } from 'react'
-import { Play, Pause, RotateCcw, AlertTriangle, ChevronRight, Leaf } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Play, Pause, RotateCcw, AlertTriangle, ChevronRight, Leaf, ChevronDown } from 'lucide-react'
 import { usePomodoro } from '../../hooks/usePomodoro'
-import { PomodoroMode } from '../../types'
+import { PomodoroMode, AttentionBudget, CATEGORY_COLORS } from '../../types'
+import { supabase } from '../../lib/supabase'
 
 interface Props {
   userId: string
+  date: string
   onRunningChange?: (running: boolean) => void
 }
 
@@ -38,25 +40,58 @@ const DURATIONS: Record<PomodoroMode, number> = {
   long_break: 15 * 60,
 }
 
-export default function PomodoroTimer({ userId, onRunningChange }: Props) {
+const CATEGORY_EMOJI: Record<string, string> = {
+  'Deep Work': '🧠',
+  'Learning':  '📚',
+  'Creative':  '🎨',
+  'Admin':     '📋',
+  'Exercise':  '💪',
+  'Rest':      '😴',
+  'Social':    '🤝',
+}
+
+export default function PomodoroTimer({ userId, date, onRunningChange }: Props) {
   const { state, start, pause, reset, abandon, addDistraction, setTask, switchMode } = usePomodoro(userId)
-  const [taskInput, setTaskInput] = useState('')
+
+  // Today's planned budget rows fetched from Supabase
+  const [budgets, setBudgets] = useState<AttentionBudget[]>([])
+  // Which budget row the user selected
+  const [selectedBudgetId, setSelectedBudgetId] = useState<string>('')
+  // Optional free-text note within the category
+  const [taskNote, setTaskNote] = useState('')
+  // Whether the picker is locked (session is running)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const { mode, timeLeft, isRunning, cycles, distractions } = state
 
-  // Notify parent of running state for distraction tracking
-  const handleStart = () => {
-    start()
-    onRunningChange?.(true)
-  }
-  const handlePause = () => {
-    pause()
-    onRunningChange?.(false)
-  }
-  const handleAbandon = () => {
-    abandon()
-    onRunningChange?.(false)
-  }
+  // Load today's budgets
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase
+        .from('attention_budgets')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .order('created_at')
+      setBudgets(data ?? [])
+    }
+    load()
+  }, [userId, date])
+
+  // Whenever the selection changes, push it into the hook
+  useEffect(() => {
+    const row = budgets.find(b => b.id === selectedBudgetId) ?? null
+    const label = row
+      ? taskNote.trim() ? `${row.category} — ${taskNote.trim()}` : row.category
+      : taskNote.trim()
+    setTask(label, row?.category ?? null, row?.id ?? null)
+  }, [selectedBudgetId, taskNote, budgets, setTask])
+
+  const selectedBudget = budgets.find(b => b.id === selectedBudgetId) ?? null
+
+  const handleStart = () => { start(); onRunningChange?.(true) }
+  const handlePause = () => { pause(); onRunningChange?.(false) }
+  const handleAbandon = () => { abandon(); onRunningChange?.(false) }
 
   const totalSeconds = DURATIONS[mode]
   const progress = timeLeft / totalSeconds
@@ -67,15 +102,9 @@ export default function PomodoroTimer({ userId, onRunningChange }: Props) {
   const mins = String(Math.floor(timeLeft / 60)).padStart(2, '0')
   const secs = String(timeLeft % 60).padStart(2, '0')
 
-  const handleTaskKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      setTask(taskInput)
-      ;(e.target as HTMLInputElement).blur()
-    }
-  }
-
   return (
     <div className="flex flex-col items-center gap-6 pb-4">
+
       {/* Mode selector */}
       <div className="flex bg-gray-800/80 rounded-2xl p-1 gap-1">
         {(Object.keys(MODE_LABELS) as PomodoroMode[]).map(m => (
@@ -113,21 +142,89 @@ export default function PomodoroTimer({ userId, onRunningChange }: Props) {
             {mins}:{secs}
           </span>
           <span className="text-gray-500 text-sm">{MODE_LABELS[mode]}</span>
-          {state.taskLabel && (
-            <span className="text-gray-400 text-xs mt-1 max-w-[150px] truncate">{state.taskLabel}</span>
+          {/* Show selected category + note inside the ring */}
+          {selectedBudget && (
+            <div className="flex items-center gap-1 mt-1">
+              <span className="text-xs">{CATEGORY_EMOJI[selectedBudget.category] ?? '📌'}</span>
+              <span className="text-xs font-medium" style={{ color: selectedBudget.color ?? CATEGORY_COLORS[selectedBudget.category] }}>
+                {selectedBudget.category}
+              </span>
+            </div>
+          )}
+          {taskNote.trim() && (
+            <span className="text-gray-500 text-[11px] max-w-[140px] truncate">{taskNote.trim()}</span>
           )}
         </div>
       </div>
 
-      {/* Task input */}
-      <input
-        type="text"
-        placeholder="What are you focusing on? Press Enter to set"
-        value={taskInput}
-        onChange={e => setTaskInput(e.target.value)}
-        onKeyDown={handleTaskKey}
-        className="w-full bg-gray-800 text-white text-sm px-4 py-3 rounded-xl border border-gray-700 focus:border-indigo-500 outline-none text-center placeholder:text-gray-600 transition-colors"
-      />
+      {/* ── Focus picker (only shown in focus mode, locked while running) ── */}
+      {mode === 'focus' && (
+        <div className="w-full space-y-2">
+
+          {budgets.length > 0 ? (
+            // --- Budget category picker ---
+            <div>
+              <p className="text-gray-500 text-xs mb-1.5 px-1">What are you working on?</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {/* "No category" option */}
+                <button
+                  disabled={isRunning}
+                  onClick={() => setSelectedBudgetId('')}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    selectedBudgetId === ''
+                      ? 'bg-gray-700 border-gray-500 text-white'
+                      : 'bg-gray-800 border-gray-700 text-gray-500 hover:border-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  <span>✨</span>
+                  <span className="text-xs">Unplanned</span>
+                </button>
+
+                {budgets.map(b => (
+                  <button
+                    key={b.id}
+                    disabled={isRunning}
+                    onClick={() => setSelectedBudgetId(b.id)}
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                      selectedBudgetId === b.id
+                        ? 'border-opacity-100 text-white'
+                        : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-200'
+                    }`}
+                    style={selectedBudgetId === b.id ? {
+                      backgroundColor: (b.color ?? CATEGORY_COLORS[b.category]) + '22',
+                      borderColor: b.color ?? CATEGORY_COLORS[b.category],
+                      color: b.color ?? CATEGORY_COLORS[b.category],
+                    } : {}}
+                  >
+                    <span>{CATEGORY_EMOJI[b.category] ?? '📌'}</span>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="text-xs font-medium leading-tight truncate">{b.category}</p>
+                      <p className="text-[10px] opacity-60 leading-tight">{b.hours_used.toFixed(1)}h / {b.hours_allocated}h</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            // --- No plan yet: nudge to create one ---
+            <div className="bg-amber-950/20 border border-amber-800/30 rounded-xl px-4 py-3">
+              <p className="text-amber-300 text-xs leading-relaxed">
+                💡 You haven't set a plan for today yet. Go to <strong>Planner</strong> to allocate your hours — then this picker will show your categories.
+              </p>
+            </div>
+          )}
+
+          {/* Optional specific task note */}
+          <input
+            type="text"
+            placeholder={selectedBudget ? `Specific task within ${selectedBudget.category} (optional)` : 'Specific task (optional)'}
+            value={taskNote}
+            disabled={isRunning}
+            onChange={e => setTaskNote(e.target.value)}
+            className="w-full bg-gray-800 text-white text-sm px-4 py-3 rounded-xl border border-gray-700 focus:border-indigo-500 outline-none text-center placeholder:text-gray-600 transition-colors disabled:opacity-50"
+          />
+        </div>
+      )}
 
       {/* Controls */}
       <div className="flex items-center gap-4">
@@ -195,7 +292,7 @@ export default function PomodoroTimer({ userId, onRunningChange }: Props) {
         </div>
       )}
 
-      {/* Break suggestion after session */}
+      {/* Break suggestion */}
       {!isRunning && cycles > 0 && mode !== 'focus' && (
         <div className="flex items-center gap-2 bg-emerald-900/20 border border-emerald-800/30 rounded-xl px-4 py-3 w-full">
           <Leaf className="w-4 h-4 text-emerald-400 flex-shrink-0" />
