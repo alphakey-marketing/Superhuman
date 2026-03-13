@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
-import { Plus, Trash2, GripVertical, Clock, ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { Plus, Trash2, GripVertical, Clock, ChevronDown, ChevronUp, Info, Zap } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { AttentionBudget, CATEGORY_COLORS } from '../../types'
 
@@ -46,6 +46,120 @@ const CATEGORY_META: Record<string, { emoji: string; what: string; examples: str
     examples: 'Dinner with family, catching up with friends, team bonding, mentoring',
   },
 }
+
+// ─── Fragment Time Playbook ───────────────────────────────────────────────────
+// These are the "in-between" micro-windows that most people waste.
+// Each entry teaches the user the best use of that specific window.
+const FRAGMENT_SLOTS = [
+  {
+    id: 'commute-to',
+    label: 'Morning commute',
+    duration: '30–60 min',
+    emoji: '🚇',
+    color: '#6366f1',
+    context: 'You\'re in transit — hands and eyes are occupied. Your brain is fresh but can\'t read or type.',
+    best: 'Audio Learning',
+    bestEmoji: '📚',
+    why: 'This is the single best slot for podcasts, audiobooks, and language apps. Your mind is alert and distraction-free. 5 commute-days/week = 4+ hours of learning that cost you nothing.',
+    tactics: [
+      'Pick ONE podcast or audiobook and stick to it for a week (no switching)',
+      'Use Audible, Spotify, or Anki audio cards for language learning',
+      'If walking: listen at 1.5x speed to cover more ground',
+      'If driving: keep it audio-only, no visual content',
+    ],
+    avoid: 'Social media scrolling — it spikes cortisol before your most important work block.',
+  },
+  {
+    id: 'commute-back',
+    label: 'Evening commute',
+    duration: '30–60 min',
+    emoji: '🌆',
+    color: '#f59e0b',
+    context: 'Your brain is fatigued after a full day. Cognitive capacity is low. You\'re transitioning from work to home.',
+    best: 'Rest or Light Audio',
+    bestEmoji: '😴',
+    why: 'The evening commute is a natural decompression window. Using it to mentally "switch off" means you arrive home present — not still at the office in your head. This directly improves sleep quality.',
+    tactics: [
+      'Music, ambient sounds, or a light entertainment podcast',
+      'Avoid checking work emails — this extends your workday mentally',
+      'If walking: no headphones occasionally — let your mind wander (this is called "diffuse thinking" and helps creativity)',
+      'Use this window to decide ONE thing you want to do when you get home',
+    ],
+    avoid: 'Heavy learning or work content — your cognitive tank is empty and retention drops to near zero.',
+  },
+  {
+    id: 'lunch',
+    label: 'Lunch break',
+    duration: '60–90 min',
+    emoji: '🍱',
+    color: '#10b981',
+    context: 'Mid-day break. You have some mental energy left but are past your morning peak. Body needs food and movement.',
+    best: 'Walk + Admin or Social',
+    bestEmoji: '🚶',
+    why: 'A 20-min walk after eating improves afternoon focus by ~20% (research-backed). The remaining time is perfect for inbox zero, quick admin tasks, or social connection — low-cognitive work that still moves the needle.',
+    tactics: [
+      '20-min walk first — even around the block. Non-negotiable.',
+      'Batch all your email replies into this window (inbox zero method)',
+      'Eat lunch with a colleague once a week — social capital compounds',
+      'If you have a side project: 30 min of creative work here adds up to 2.5h/week',
+    ],
+    avoid: 'Eating at your desk while working — you skip the recovery and return to the PM block already depleted.',
+  },
+  {
+    id: 'micro-5',
+    label: '5-min gaps (between meetings)',
+    duration: '5–10 min',
+    emoji: '⚡',
+    color: '#ec4899',
+    context: 'Tiny windows between calls, meetings, or tasks. Too short to start deep work. Easy to waste on reflexive phone-checking.',
+    best: 'Capture + Reset',
+    bestEmoji: '✍️',
+    why: 'Five minutes isn\'t enough to do deep work, but it\'s perfect for capturing thoughts, clearing your head, and setting up the next task. Top performers use these gaps intentionally — everyone else loses them to the feed.',
+    tactics: [
+      'Write down one thought, idea, or task that\'s in your head (brain dump)',
+      'Stand up, stretch, look out a window for 60 seconds — resets focus',
+      'Review your task list and pick the single next action',
+      'Take 5 slow breaths — lowers cortisol and primes for the next block',
+    ],
+    avoid: 'Opening Instagram, TikTok, or news — you\'ll get pulled in and your "5 minutes" becomes 25.',
+  },
+  {
+    id: 'micro-waiting',
+    label: 'Waiting time (queues, lifts, lobbies)',
+    duration: '2–10 min',
+    emoji: '⏳',
+    color: '#8b5cf6',
+    context: 'Unpredictable micro-moments scattered through the day — waiting for coffee, lifts, colleagues. Traditionally 100% dead time.',
+    best: 'Flashcards or Reflection',
+    bestEmoji: '🃏',
+    why: 'Spaced repetition flashcard apps (like Anki) are designed exactly for these 2-minute windows. Consistent daily review — even 10 cards — builds vocabulary, concepts, or facts faster than any study session.',
+    tactics: [
+      'Keep Anki or a flashcard app as your default "waiting" app (replace social media)',
+      'Review your top Motivation Vault entry — takes 30 seconds, high ROI',
+      'Use voice memos to capture ideas while walking between places',
+      'One positive observation about your surroundings — trains present-moment awareness',
+    ],
+    avoid: 'Nothing — literally any intentional use of this time beats the default (mindless scrolling).',
+  },
+  {
+    id: 'post-lunch-dip',
+    label: 'Post-lunch dip (2–3 PM)',
+    duration: '30–60 min',
+    emoji: '😪',
+    color: '#f97316',
+    context: 'The post-lunch energy crash is biological — your body diverts blood to digestion. Cognitive performance dips for most people between 1:30–3 PM.',
+    best: 'Admin, Meetings, or a Nap',
+    bestEmoji: '📋',
+    why: 'Fighting the dip with deep work is the wrong move — you produce lower quality output and it frustrates you. Instead, schedule your lowest-cognitive tasks here (admin, meetings, replies) and save the afternoon recovery for a second deep work block at 4–6 PM.',
+    tactics: [
+      'Block your calendar 1:30–3 PM for admin/meetings — don\'t fight the biology',
+      'If you can: a 20-min nap (set alarm) gives you 3+ hours of extra alertness',
+      'Walk again if you didn\'t at lunch — even 10 min helps',
+      'Drink water — dehydration amplifies the dip',
+    ],
+    avoid: 'Starting your most important deep work task during the dip — you\'ll struggle, produce worse work, and associate the task with difficulty.',
+  },
+]
 
 const DAY_TEMPLATES = [
   {
@@ -133,6 +247,8 @@ export default function BudgetPlanner({ userId, date }: Props) {
   const [applyingTemplate, setApplyingTemplate] = useState(false)
   const [expandedMeta, setExpandedMeta] = useState<string | null>(null)
   const [showTemplates, setShowTemplates] = useState(true)
+  const [showFragments, setShowFragments] = useState(false)
+  const [expandedFragment, setExpandedFragment] = useState<string | null>(null)
 
   const totalAllocated = budgets.reduce((sum, b) => sum + b.hours_allocated, 0)
   const totalUsed = budgets.reduce((sum, b) => sum + b.hours_used, 0)
@@ -249,6 +365,90 @@ export default function BudgetPlanner({ userId, date }: Props) {
                 <p className="text-gray-600 text-xs mt-2 italic">"{t.tip}"</p>
               </button>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Fragment Time Playbook ─────────────────────────────────────── */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+        <button
+          onClick={() => setShowFragments(v => !v)}
+          className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-800/40 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-yellow-400" />
+            <span className="text-white text-sm font-semibold">Fragment time playbook</span>
+            <span className="text-xs bg-yellow-600/20 text-yellow-400 border border-yellow-600/30 px-2 py-0.5 rounded-full">+2–3h/day hidden</span>
+          </div>
+          {showFragments ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+        </button>
+
+        {showFragments && (
+          <div className="px-4 pb-4">
+            <p className="text-gray-500 text-xs mb-4 leading-relaxed">
+              Fragment time = the gaps between your main blocks (commute, lunch, waiting, the post-lunch dip). Most people lose 2–3 hours a day here. Tap each window to see exactly what to do with it.
+            </p>
+            <div className="space-y-2">
+              {FRAGMENT_SLOTS.map(slot => (
+                <div key={slot.id} className="rounded-xl border border-gray-700 overflow-hidden">
+                  {/* Header row */}
+                  <button
+                    onClick={() => setExpandedFragment(expandedFragment === slot.id ? null : slot.id)}
+                    className="w-full flex items-center gap-3 px-3.5 py-3 hover:bg-gray-800/60 transition-colors text-left"
+                  >
+                    <span className="text-xl flex-shrink-0">{slot.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-white text-sm font-medium">{slot.label}</p>
+                        <span className="text-gray-600 text-xs">{slot.duration}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs">{slot.bestEmoji}</span>
+                        <span className="text-xs font-medium" style={{ color: slot.color }}>Best use: {slot.best}</span>
+                      </div>
+                    </div>
+                    {expandedFragment === slot.id
+                      ? <ChevronUp className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                      : <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />}
+                  </button>
+
+                  {/* Expanded content */}
+                  {expandedFragment === slot.id && (
+                    <div className="px-4 pb-4 pt-1 bg-gray-800/30 border-t border-gray-700/50 space-y-3">
+                      {/* Context */}
+                      <div className="text-gray-500 text-xs leading-relaxed italic">
+                        {slot.context}
+                      </div>
+
+                      {/* Why this works */}
+                      <div className="bg-gray-900 rounded-xl p-3 border border-gray-700">
+                        <p className="text-xs font-semibold mb-1" style={{ color: slot.color }}>💡 Why this works</p>
+                        <p className="text-gray-300 text-xs leading-relaxed">{slot.why}</p>
+                      </div>
+
+                      {/* Tactics */}
+                      <div>
+                        <p className="text-gray-400 text-xs font-semibold mb-2">✅ Tactics</p>
+                        <div className="space-y-1.5">
+                          {slot.tactics.map((t, i) => (
+                            <div key={i} className="flex items-start gap-2">
+                              <span className="text-gray-600 text-xs mt-0.5 flex-shrink-0">{i + 1}.</span>
+                              <p className="text-gray-300 text-xs leading-relaxed">{t}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Avoid */}
+                      <div className="bg-red-950/20 border border-red-900/30 rounded-xl p-3">
+                        <p className="text-red-400 text-xs font-semibold mb-1">🚫 Avoid</p>
+                        <p className="text-gray-400 text-xs leading-relaxed">{slot.avoid}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
