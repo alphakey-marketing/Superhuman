@@ -28,6 +28,14 @@ const tabs = [
   { id: 'vault'     as Tab, label: 'Vault',     shortLabel: 'Vault', icon: Flame },
 ]
 
+function getTodayStr() {
+  return new Date().toISOString().split('T')[0]
+}
+
+function getTodayLabel() {
+  return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+}
+
 export default function App() {
   const { user, loading, signOut } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
@@ -41,8 +49,31 @@ export default function App() {
   const [hasSessions, setHasSessions] = useState(false)
   const [hasSkills, setHasSkills] = useState(false)
 
-  const today = new Date().toISOString().split('T')[0]
-  const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+  // ── today as state so a midnight tick refreshes the whole app ──────────────
+  const [today, setToday]           = useState(getTodayStr)
+  const [todayLabel, setTodayLabel] = useState(getTodayLabel)
+
+  useEffect(() => {
+    // Calculate ms until next midnight, then set an interval to tick every 24h
+    const scheduleRefresh = () => {
+      const now  = new Date()
+      const next = new Date(now)
+      next.setDate(next.getDate() + 1)
+      next.setHours(0, 0, 0, 0)
+      const msUntilMidnight = next.getTime() - now.getTime()
+
+      const timeout = setTimeout(() => {
+        setToday(getTodayStr())
+        setTodayLabel(getTodayLabel())
+        scheduleRefresh() // re-schedule for the following midnight
+      }, msUntilMidnight)
+
+      return timeout
+    }
+
+    const timeout = scheduleRefresh()
+    return () => clearTimeout(timeout)
+  }, [])
 
   useDistraction(user?.id, pomodoroRunning)
 
@@ -112,7 +143,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Live mini-pill: visible on all tabs except Timer when a session is running */}
             {pomodoroRunning && pomodoroTimeLeft !== null && activeTab !== 'pomodoro' && (
               <button
                 onClick={() => setActiveTab('pomodoro')}
@@ -169,7 +199,6 @@ export default function App() {
               >
                 <Icon className="w-4 h-4" />
                 <span className="text-[10px] leading-none">{tab.shortLabel}</span>
-                {/* Pulse dot on Timer tab when running away from it */}
                 {isTimer && pomodoroRunning && activeTab !== 'pomodoro' && (
                   <span className="absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
                 )}
@@ -261,11 +290,6 @@ export default function App() {
           </>
         )}
 
-        {/*
-          PomodoroTimer is ALWAYS in the DOM — never conditionally removed.
-          CSS 'hidden' makes it invisible on other tabs but keeps the component
-          mounted so its setInterval and all internal state survive tab switches.
-        */}
         <div className={activeTab === 'pomodoro' ? 'block' : 'hidden'}>
           <div className="mb-3 text-center">
             <h2 className="text-xl font-bold text-white">Focus Timer</h2>
