@@ -49,6 +49,14 @@ export interface PracticeSkill {
   created_at: string
 }
 
+export interface PracticeSubSkill {
+  id: string
+  user_id: string
+  skill_id: string
+  name: string
+  created_at: string
+}
+
 export interface PracticeSession {
   id: string
   user_id: string
