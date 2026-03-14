@@ -8,6 +8,8 @@ interface Props {
   userId: string
   date: string
   onRunningChange?: (running: boolean) => void
+  // Bubbles current timeLeft up to App so the header mini-pill stays accurate
+  onTimeLeftChange?: (timeLeft: number | null) => void
 }
 
 const MODE_LABELS: Record<PomodoroMode, string> = {
@@ -50,19 +52,22 @@ const CATEGORY_EMOJI: Record<string, string> = {
   'Social':    '🤝',
 }
 
-export default function PomodoroTimer({ userId, date, onRunningChange }: Props) {
+export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLeftChange }: Props) {
   const { state, start, pause, reset, abandon, addDistraction, setTask, switchMode } = usePomodoro(userId)
 
-  const [budgets, setBudgets]           = useState<AttentionBudget[]>([])
-  const [budgetsLoaded, setBudgetsLoaded] = useState(false)   // ← FIX: guard against flash
+  const [budgets, setBudgets]             = useState<AttentionBudget[]>([])
+  const [budgetsLoaded, setBudgetsLoaded] = useState(false)
   const [selectedBudgetId, setSelectedBudgetId] = useState<string>('')
-  const [taskNote, setTaskNote]         = useState('')
+  const [taskNote, setTaskNote]           = useState('')
 
   const { mode, timeLeft, isRunning, cycles, distractions } = state
 
-  // ── Fetch budgets ─────────────────────────────────────────────────────────
-  // Extracted into a stable callback so we can call it both on mount AND
-  // after each completed cycle (to refresh hours_used).
+  // ── Bubble timeLeft up so the header mini-pill is always live ───────────────
+  useEffect(() => {
+    onTimeLeftChange?.(isRunning ? timeLeft : null)
+  }, [timeLeft, isRunning, onTimeLeftChange])
+
+  // ── Budget fetch ─────────────────────────────────────────────────────────────
   const loadBudgets = useCallback(async () => {
     const { data } = await supabase
       .from('attention_budgets')
@@ -71,26 +76,22 @@ export default function PomodoroTimer({ userId, date, onRunningChange }: Props) 
       .eq('date', date)
       .order('created_at')
     setBudgets(data ?? [])
-    setBudgetsLoaded(true)   // ← only show warning AFTER this resolves
+    setBudgetsLoaded(true)
   }, [userId, date])
 
-  // Initial load
   useEffect(() => { loadBudgets() }, [loadBudgets])
 
-  // Re-fetch after every completed cycle so hours_used bar stays accurate.
-  // `cycles` increments in the reducer when a focus block completes.
-  useEffect(() => {
-    if (cycles > 0) loadBudgets()
-  }, [cycles, loadBudgets])
+  // Re-fetch after each cycle to keep hours_used accurate
+  useEffect(() => { if (cycles > 0) loadBudgets() }, [cycles, loadBudgets])
 
-  // Push selection into hook whenever it changes
+  // Push selection into hook
   useEffect(() => {
     const row = budgets.find(b => b.id === selectedBudgetId) ?? null
     const label = row
       ? taskNote.trim() ? `${row.category} — ${taskNote.trim()}` : row.category
       : taskNote.trim()
     setTask(label, row?.category ?? null, row?.id ?? null)
-  }, [selectedBudgetId, taskNote, budgets])  // ← setTask intentionally omitted: it's stable (useCallback [])
+  }, [selectedBudgetId, taskNote, budgets])
 
   const selectedBudget = budgets.find(b => b.id === selectedBudgetId) ?? null
 
@@ -164,12 +165,7 @@ export default function PomodoroTimer({ userId, date, onRunningChange }: Props) 
       {/* Focus picker — only in focus mode */}
       {mode === 'focus' && (
         <div className="w-full space-y-2">
-
-          {/* ── KEY FIX: only evaluate budgets.length after fetch has resolved.
-               Before `budgetsLoaded` is true, render nothing here so there
-               is zero chance of the warning flashing during re-renders. ── */}
           {!budgetsLoaded ? (
-            // Skeleton while loading — prevents any flash of the warning
             <div className="h-10 rounded-xl bg-gray-800 animate-pulse" />
           ) : budgets.length > 0 ? (
             <div>
@@ -214,7 +210,6 @@ export default function PomodoroTimer({ userId, date, onRunningChange }: Props) 
               </div>
             </div>
           ) : (
-            // Only shown after fetch resolves with genuinely zero rows
             <div className="bg-amber-950/20 border border-amber-800/30 rounded-xl px-4 py-3">
               <p className="text-amber-300 text-xs leading-relaxed">
                 💡 You haven't set a plan for today yet. Go to <strong>Planner</strong> to allocate your hours — then this picker will show your categories.
@@ -278,8 +273,8 @@ export default function PomodoroTimer({ userId, date, onRunningChange }: Props) 
       {/* Stats */}
       <div className="w-full grid grid-cols-3 gap-3">
         {[
-          { label: 'Cycles',       value: cycles,           color: 'text-indigo-400' },
-          { label: 'Distractions', value: distractions,     color: distractions > 3 ? 'text-red-400' : 'text-yellow-400' },
+          { label: 'Cycles',       value: cycles,            color: 'text-indigo-400' },
+          { label: 'Distractions', value: distractions,      color: distractions > 3 ? 'text-red-400' : 'text-yellow-400' },
           { label: 'Focus Time',   value: `${cycles * 25}m`, color: 'text-green-400' },
         ].map(stat => (
           <div key={stat.label} className="bg-gray-800 rounded-xl p-3 text-center">

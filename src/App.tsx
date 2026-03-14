@@ -34,14 +34,13 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [showBreak, setShowBreak] = useState(false)
   const [pomodoroRunning, setPomodoroRunning] = useState(false)
+  const [pomodoroTimeLeft, setPomodoroTimeLeft] = useState<number | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   const [hasBudget, setHasBudget] = useState(false)
   const [hasSessions, setHasSessions] = useState(false)
   const [hasSkills, setHasSkills] = useState(false)
 
-  // Single source of truth for today's date string — passed to both
-  // BudgetPlanner and PomodoroTimer so their Supabase queries always match.
   const today = new Date().toISOString().split('T')[0]
   const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
 
@@ -72,6 +71,12 @@ export default function App() {
   const handleOnboardingDone = () => {
     localStorage.setItem(ONBOARDING_KEY, '1')
     setShowOnboarding(false)
+  }
+
+  const formatTime = (secs: number) => {
+    const m = String(Math.floor(secs / 60)).padStart(2, '0')
+    const s = String(secs % 60).padStart(2, '0')
+    return `${m}:${s}`
   }
 
   if (loading) {
@@ -105,7 +110,19 @@ export default function App() {
               <span className="text-gray-500 text-xs ml-2 hidden sm:inline">{todayLabel}</span>
             </div>
           </div>
+
           <div className="flex items-center gap-2">
+            {/* Live mini-pill: visible on all tabs except Timer when a session is running */}
+            {pomodoroRunning && pomodoroTimeLeft !== null && activeTab !== 'pomodoro' && (
+              <button
+                onClick={() => setActiveTab('pomodoro')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-900/50 hover:bg-indigo-900/70 border border-indigo-700/50 text-indigo-300 text-xs rounded-lg transition-colors font-mono"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                {formatTime(pomodoroTimeLeft)}
+              </button>
+            )}
+
             <button
               onClick={() => setShowBreak(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-800/40 text-emerald-400 text-xs rounded-lg transition-colors"
@@ -141,16 +158,21 @@ export default function App() {
         <div className="max-w-2xl mx-auto px-2 flex">
           {tabs.map(tab => {
             const Icon = tab.icon
+            const isTimer = tab.id === 'pomodoro'
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex flex-col items-center gap-0.5 px-1 py-2.5 border-b-2 transition-all font-medium ${
+                className={`flex-1 flex flex-col items-center gap-0.5 px-1 py-2.5 border-b-2 transition-all font-medium relative ${
                   activeTab === tab.id ? 'border-indigo-500 text-white' : 'border-transparent text-gray-500 hover:text-gray-300'
                 }`}
               >
                 <Icon className="w-4 h-4" />
                 <span className="text-[10px] leading-none">{tab.shortLabel}</span>
+                {/* Pulse dot on Timer tab when running away from it */}
+                {isTimer && pomodoroRunning && activeTab !== 'pomodoro' && (
+                  <span className="absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                )}
               </button>
             )
           })}
@@ -191,24 +213,6 @@ export default function App() {
               </p>
             </div>
             <BudgetPlanner userId={user.id} date={today} />
-          </>
-        )}
-
-        {activeTab === 'pomodoro' && (
-          <>
-            <div className="mb-3 text-center">
-              <h2 className="text-xl font-bold text-white">Focus Timer</h2>
-              <p className="text-gray-500 text-sm mt-0.5">25 min focus · 5 min break · repeat</p>
-            </div>
-            <div className="bg-indigo-950/30 border border-indigo-900/40 rounded-xl px-4 py-3 mb-4">
-              <p className="text-indigo-300 text-xs leading-relaxed">
-                💡 <strong>How this works:</strong> Work in 25-min blocks. No phone, no tabs. If you get distracted, tap ⚠️ to log it — awareness is how you improve. Take a 🌿 break after each cycle.
-              </p>
-            </div>
-            {/* date={today} is critical — without it, PomodoroTimer's Supabase
-                query uses undefined and always returns 0 budget rows, causing
-                the "no plan" warning even after the user set one in Planner. */}
-            <PomodoroTimer userId={user.id} date={today} onRunningChange={setPomodoroRunning} />
           </>
         )}
 
@@ -256,6 +260,29 @@ export default function App() {
             <MotivationVault userId={user.id} />
           </>
         )}
+
+        {/*
+          PomodoroTimer is ALWAYS in the DOM — never conditionally removed.
+          CSS 'hidden' makes it invisible on other tabs but keeps the component
+          mounted so its setInterval and all internal state survive tab switches.
+        */}
+        <div className={activeTab === 'pomodoro' ? 'block' : 'hidden'}>
+          <div className="mb-3 text-center">
+            <h2 className="text-xl font-bold text-white">Focus Timer</h2>
+            <p className="text-gray-500 text-sm mt-0.5">25 min focus · 5 min break · repeat</p>
+          </div>
+          <div className="bg-indigo-950/30 border border-indigo-900/40 rounded-xl px-4 py-3 mb-4">
+            <p className="text-indigo-300 text-xs leading-relaxed">
+              💡 <strong>How this works:</strong> Work in 25-min blocks. No phone, no tabs. If you get distracted, tap ⚠️ to log it — awareness is how you improve. Take a 🌿 break after each cycle.
+            </p>
+          </div>
+          <PomodoroTimer
+            userId={user.id}
+            date={today}
+            onRunningChange={setPomodoroRunning}
+            onTimeLeftChange={setPomodoroTimeLeft}
+          />
+        </div>
 
       </main>
 
