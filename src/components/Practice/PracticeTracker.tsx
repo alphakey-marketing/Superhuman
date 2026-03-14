@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronUp, Zap, Target, Clock, Star, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronUp, Zap, Star, AlertCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { PracticeSkill, PracticeSession, SKILL_COLORS } from '../../types'
 
@@ -8,6 +8,12 @@ interface Props { userId: string }
 const SKILL_CATEGORIES = ['Coding', 'Writing', 'Music', 'Sport', 'Language', 'Business', 'Art', 'Other']
 
 const MILESTONES = [10, 25, 50, 100, 200, 500, 1000]
+
+const TEMPLATE_SKILLS = [
+  { name: 'Japanese',  category: 'Language', color: '#ef4444', target_hours: 1000 },
+  { name: 'Badminton', category: 'Sport',    color: '#10b981', target_hours: 200  },
+  { name: 'Singing',   category: 'Music',    color: '#f59e0b', target_hours: 500  },
+]
 
 function getMilestone(hours: number) {
   const reached = MILESTONES.filter(m => hours >= m)
@@ -55,9 +61,7 @@ export default function PracticeTracker({ userId }: Props) {
   const [sessionQuality, setSessionQuality] = useState(3)
   const [sessionNotes, setSessionNotes] = useState('')
 
-  useEffect(() => {
-    loadData()
-  }, [userId])
+  useEffect(() => { loadData() }, [userId])
 
   const loadData = async () => {
     const [{ data: sk, error: skErr }, { data: se, error: seErr }] = await Promise.all([
@@ -66,9 +70,38 @@ export default function PracticeTracker({ userId }: Props) {
     ])
     if (skErr) { setError(`Failed to load skills: ${skErr.message}`); setLoading(false); return }
     if (seErr) { setError(`Failed to load sessions: ${seErr.message}`); setLoading(false); return }
-    setSkills(sk ?? [])
+
+    const loadedSkills = sk ?? []
     setSessions(se ?? [])
+
+    // Seed template skills if the user has none yet
+    if (loadedSkills.length === 0) {
+      const seeded = await seedTemplateSkills()
+      setSkills(seeded)
+    } else {
+      setSkills(loadedSkills)
+    }
     setLoading(false)
+  }
+
+  const seedTemplateSkills = async (): Promise<PracticeSkill[]> => {
+    const rows = TEMPLATE_SKILLS.map(t => ({
+      user_id: userId,
+      name: t.name,
+      category: t.category,
+      color: t.color,
+      target_hours: t.target_hours,
+      total_hours: 0,
+    }))
+    const { data, error: seedErr } = await supabase
+      .from('practice_skills')
+      .insert(rows)
+      .select()
+    if (seedErr) {
+      setError(`Could not seed template skills: ${seedErr.message} (code: ${seedErr.code})`)
+      return []
+    }
+    return data ?? []
   }
 
   const addSkill = async () => {
@@ -82,7 +115,6 @@ export default function PracticeTracker({ userId }: Props) {
       target_hours: newSkillTarget,
       total_hours: 0,
     }).select().single()
-
     if (insertErr) {
       setError(`Could not add skill: ${insertErr.message} (code: ${insertErr.code})`)
       return
@@ -114,7 +146,6 @@ export default function PracticeTracker({ userId }: Props) {
       quality: sessionQuality,
       notes: sessionNotes.trim() || null,
     }).select().single()
-
     if (sessionErr) {
       setError(`Could not log session: ${sessionErr.message} (code: ${sessionErr.code})`)
       return
@@ -123,28 +154,18 @@ export default function PracticeTracker({ userId }: Props) {
       setError('Could not log session: insert returned no data. Check your Supabase RLS policies for practice_sessions.')
       return
     }
-
     setSessions(prev => [sessionData, ...prev])
 
-    // Try to refresh from DB (relies on trigger). If trigger absent, fall back to client-side sum.
-    const { data: sk, error: skErr } = await supabase
-      .from('practice_skills')
-      .select('*')
-      .eq('id', skillId)
-      .single()
-
-    if (sk && !skErr) {
-      // Check if DB trigger updated total_hours; if not, compute client-side
+    // Try DB-refreshed total_hours (relies on trigger), fall back to client sum
+    const { data: sk } = await supabase.from('practice_skills').select('*').eq('id', skillId).single()
+    if (sk) {
       const allSessions = [sessionData, ...sessions.filter(s => s.skill_id === skillId)]
       const clientTotal = allSessions.reduce((sum, s) => sum + s.duration_minutes, 0) / 60
       const dbTotal = Number(sk.total_hours)
-      // If DB total didn't increase, the trigger is missing — use client total
-      const skill = skills.find(s => s.id === skillId)
-      const prevTotal = skill ? Number(skill.total_hours) : 0
+      const prevTotal = skills.find(s => s.id === skillId) ? Number(skills.find(s => s.id === skillId)!.total_hours) : 0
       const updatedTotal = dbTotal > prevTotal ? dbTotal : clientTotal
       setSkills(prev => prev.map(s => s.id === skillId ? { ...sk, total_hours: updatedTotal } : s))
     } else {
-      // DB read failed — compute entirely client-side
       const allSessions = [sessionData, ...sessions.filter(s => s.skill_id === skillId)]
       const clientTotal = allSessions.reduce((sum, s) => sum + s.duration_minutes, 0) / 60
       setSkills(prev => prev.map(s => s.id === skillId ? { ...s, total_hours: clientTotal } : s))
@@ -222,7 +243,6 @@ export default function PracticeTracker({ userId }: Props) {
 
           return (
             <div key={skill.id} className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-              {/* Skill header */}
               <div className="p-4">
                 <div className="flex items-start gap-3">
                   <div className="w-3 h-3 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: skill.color }} />
@@ -248,8 +268,6 @@ export default function PracticeTracker({ userId }: Props) {
                         </button>
                       </div>
                     </div>
-
-                    {/* Progress bar */}
                     <div className="mt-3">
                       <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
                         <span>{pct.toFixed(0)}% to {skill.target_hours}h goal</span>
@@ -263,8 +281,6 @@ export default function PracticeTracker({ userId }: Props) {
                         />
                       </div>
                     </div>
-
-                    {/* Milestone badges */}
                     {reached > 0 && (
                       <div className="flex gap-1.5 mt-2 flex-wrap">
                         {MILESTONES.filter(m => hours >= m).map(m => (
@@ -278,7 +294,6 @@ export default function PracticeTracker({ userId }: Props) {
                 </div>
               </div>
 
-              {/* Log session form */}
               {isLogging && (
                 <div className="border-t border-gray-800 p-4 bg-gray-900/50 space-y-3">
                   <p className="text-gray-300 text-sm font-medium">Log a practice session</p>
@@ -286,8 +301,7 @@ export default function PracticeTracker({ userId }: Props) {
                     <div>
                       <label className="text-gray-500 text-xs mb-1 block">Duration (mins)</label>
                       <input
-                        type="number"
-                        min={1} max={480}
+                        type="number" min={1} max={480}
                         value={sessionMins}
                         onChange={e => setSessionMins(Number(e.target.value))}
                         className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-xl border border-gray-700 focus:border-indigo-500 outline-none"
@@ -326,7 +340,6 @@ export default function PracticeTracker({ userId }: Props) {
                 </div>
               )}
 
-              {/* Session history */}
               {isExpanded && (
                 <div className="border-t border-gray-800">
                   {skillSessions.length === 0 ? (
@@ -373,7 +386,6 @@ export default function PracticeTracker({ userId }: Props) {
         })}
       </div>
 
-      {/* Add skill form */}
       {showAddSkill ? (
         <div className="bg-gray-900 border border-indigo-800/40 rounded-2xl p-4 space-y-3">
           <p className="text-white font-medium text-sm">New Skill</p>
@@ -400,8 +412,7 @@ export default function PracticeTracker({ userId }: Props) {
             <div>
               <label className="text-gray-500 text-xs mb-1 block">Target hours</label>
               <input
-                type="number"
-                min={1}
+                type="number" min={1}
                 value={newSkillTarget}
                 onChange={e => setNewSkillTarget(Number(e.target.value))}
                 className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded-xl border border-gray-700 focus:border-indigo-500 outline-none"
