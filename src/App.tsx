@@ -49,28 +49,24 @@ export default function App() {
   const [hasSessions, setHasSessions] = useState(false)
   const [hasSkills, setHasSkills] = useState(false)
 
-  // ── today as state so a midnight tick refreshes the whole app ──────────────
+  // ── today as state — midnight setTimeout flips it for every child that receives it ──
   const [today, setToday]           = useState(getTodayStr)
   const [todayLabel, setTodayLabel] = useState(getTodayLabel)
 
   useEffect(() => {
-    // Calculate ms until next midnight, then set an interval to tick every 24h
     const scheduleRefresh = () => {
       const now  = new Date()
       const next = new Date(now)
       next.setDate(next.getDate() + 1)
       next.setHours(0, 0, 0, 0)
       const msUntilMidnight = next.getTime() - now.getTime()
-
       const timeout = setTimeout(() => {
         setToday(getTodayStr())
         setTodayLabel(getTodayLabel())
-        scheduleRefresh() // re-schedule for the following midnight
+        scheduleRefresh()
       }, msUntilMidnight)
-
       return timeout
     }
-
     const timeout = scheduleRefresh()
     return () => clearTimeout(timeout)
   }, [])
@@ -152,7 +148,6 @@ export default function App() {
                 {formatTime(pomodoroTimeLeft)}
               </button>
             )}
-
             <button
               onClick={() => setShowBreak(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-800/40 text-emerald-400 text-xs rounded-lg transition-colors"
@@ -224,8 +219,8 @@ export default function App() {
                 hasSessions={hasSessions}
                 hasSkills={hasSkills}
               />
-              <StreakWidget userId={user.id} />
-              <Dashboard userId={user.id} onNavigate={(tab) => setActiveTab(tab as Tab)} />
+              <StreakWidget userId={user.id} today={today} />
+              <Dashboard userId={user.id} today={today} onNavigate={(tab) => setActiveTab(tab as Tab)} />
             </div>
           </>
         )}
@@ -238,7 +233,7 @@ export default function App() {
             </div>
             <div className="bg-indigo-950/30 border border-indigo-900/40 rounded-xl px-4 py-3 mb-4">
               <p className="text-indigo-300 text-xs leading-relaxed">
-                💡 <strong>How this works:</strong> Decide upfront how many hours to give each area of your life today. When you have a plan, you're 2× more likely to stick to it.
+                💡 <strong>How this works:</strong> Decide upfront how many hours to give each area of your life today. When you have a plan, you’re 2× more likely to stick to it.
               </p>
             </div>
             <BudgetPlanner userId={user.id} date={today} />
@@ -253,7 +248,7 @@ export default function App() {
             </div>
             <div className="bg-indigo-950/30 border border-indigo-900/40 rounded-xl px-4 py-3 mb-4">
               <p className="text-indigo-300 text-xs leading-relaxed">
-                💡 <strong>How this works:</strong> Every time you switch tabs during a Pomodoro, it's auto-logged. Review your patterns here to find your biggest distraction triggers.
+                💡 <strong>How this works:</strong> Every time you switch tabs during a Pomodoro, it’s auto-logged. Review your patterns here to find your biggest distraction triggers.
               </p>
             </div>
             <DistractionTracker userId={user.id} />
@@ -268,7 +263,7 @@ export default function App() {
             </div>
             <div className="bg-indigo-950/30 border border-indigo-900/40 rounded-xl px-4 py-3 mb-4">
               <p className="text-indigo-300 text-xs leading-relaxed">
-                💡 <strong>How this works:</strong> Add a skill you're building. After every practice session, log the time, difficulty, and quality. Milestones unlock at 10h → 25h → 50h → 100h. The 10,000-hour rule starts with rep one.
+                💡 <strong>How this works:</strong> Add a skill you’re building. After every practice session, log the time, difficulty, and quality. Milestones unlock at 10h → 25h → 50h → 100h. The 10,000-hour rule starts with rep one.
               </p>
             </div>
             <PracticeTracker userId={user.id} />
