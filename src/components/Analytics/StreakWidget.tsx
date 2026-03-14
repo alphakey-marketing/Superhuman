@@ -3,10 +3,11 @@ import { useStreaks } from '../../hooks/useStreaks'
 
 interface Props {
   userId: string
+  today: string
 }
 
-export default function StreakWidget({ userId }: Props) {
-  const { current, longest, lastActiveDate } = useStreaks(userId)
+export default function StreakWidget({ userId, today }: Props) {
+  const { current, longest, lastActiveDate } = useStreaks(userId, today)
 
   const getFlameColor = () => {
     if (current >= 7) return 'text-orange-400'
@@ -32,7 +33,6 @@ export default function StreakWidget({ userId }: Props) {
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
-        {/* Current streak */}
         <div className="bg-gray-800 rounded-xl p-3.5 text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
             <Flame className={`w-5 h-5 ${getFlameColor()}`} />
@@ -41,7 +41,6 @@ export default function StreakWidget({ userId }: Props) {
           <p className="text-gray-500 text-xs mt-0.5">day streak</p>
         </div>
 
-        {/* Longest streak */}
         <div className="bg-gray-800 rounded-xl p-3.5 text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
             <Trophy className="w-5 h-5 text-yellow-400" />
@@ -57,7 +56,7 @@ export default function StreakWidget({ userId }: Props) {
         <div className="flex items-center justify-center gap-1.5 mt-2">
           <Calendar className="w-3 h-3 text-gray-600" />
           <p className="text-gray-600 text-xs">
-            Last active: {new Date(lastActiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            Last active: {new Date(lastActiveDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </p>
         </div>
       )}

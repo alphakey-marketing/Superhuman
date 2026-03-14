@@ -9,6 +9,7 @@ import { AttentionBudget, PomodoroSession } from '../../types'
 
 interface Props {
   userId: string
+  today: string          // passed from App so it updates on midnight rollover
   onNavigate: (tab: string) => void
 }
 
@@ -51,15 +52,17 @@ function PieTooltip({ active, payload }: any) {
   )
 }
 
-export default function Dashboard({ userId, onNavigate }: Props) {
+export default function Dashboard({ userId, today, onNavigate }: Props) {
   const [budgets, setBudgets] = useState<AttentionBudget[]>([])
   const [sessions, setSessions] = useState<PomodoroSession[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    setLoading(true)
+    setBudgets([])
+    setSessions([])
     const fetchData = async () => {
-      const today = new Date().toISOString().split('T')[0]
-      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString()
+      const weekAgo = new Date(new Date(today).getTime() - 7 * 86400000).toISOString()
       const [{ data: b }, { data: s }] = await Promise.all([
         supabase.from('attention_budgets').select('*').eq('user_id', userId).eq('date', today),
         supabase.from('pomodoro_sessions').select('*').eq('user_id', userId).gte('started_at', weekAgo).in('status', ['completed', 'active']),
@@ -69,12 +72,12 @@ export default function Dashboard({ userId, onNavigate }: Props) {
       setLoading(false)
     }
     fetchData()
-  }, [userId])
+  }, [userId, today])
 
   const pieData = budgets.map(b => ({ name: b.category, value: b.hours_allocated, color: b.color }))
 
   const weeklyData = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(Date.now() - (6 - i) * 86400000)
+    const d = new Date(new Date(today).getTime() - (6 - i) * 86400000)
     const dateStr = d.toISOString().split('T')[0]
     const daySessions = sessions.filter(s => s.started_at.startsWith(dateStr) && s.status === 'completed')
     return {
@@ -84,12 +87,13 @@ export default function Dashboard({ userId, onNavigate }: Props) {
     }
   })
 
-  const today = new Date().toISOString().split('T')[0]
   const todaySessions = sessions.filter(s => s.started_at.startsWith(today) && s.status === 'completed')
   const focusMinutes = todaySessions.reduce((sum, s) => sum + s.completed_cycles * 25, 0)
   const totalDistractions = todaySessions.reduce((sum, s) => sum + s.distractions_count, 0)
   const completedCycles = todaySessions.reduce((sum, s) => sum + s.completed_cycles, 0)
-  const focusScore = focusMinutes > 0 ? Math.max(0, Math.round(100 - (totalDistractions / Math.max(completedCycles, 1)) * 20)) : 0
+  const focusScore = focusMinutes > 0
+    ? Math.max(0, Math.round(100 - (totalDistractions / Math.max(completedCycles, 1)) * 20))
+    : 0
   const scoreColor = focusScore >= 80 ? 'text-green-400' : focusScore >= 50 ? 'text-yellow-400' : 'text-red-400'
 
   const exportCSV = () => {
@@ -123,9 +127,9 @@ export default function Dashboard({ userId, onNavigate }: Props) {
             )}
             <div className="flex gap-4 mt-3">
               {[
-                { icon: Target, label: `${completedCycles} cycles`, color: 'text-indigo-400' },
-                { icon: Zap, label: `${focusMinutes}m focused`, color: 'text-green-400' },
-                { icon: TrendingUp, label: `${totalDistractions} distractions`, color: 'text-yellow-400' },
+                { icon: Target,      label: `${completedCycles} cycles`,       color: 'text-indigo-400' },
+                { icon: Zap,         label: `${focusMinutes}m focused`,         color: 'text-green-400'  },
+                { icon: TrendingUp,  label: `${totalDistractions} distractions`, color: 'text-yellow-400' },
               ].map(({ icon: Icon, label, color }) => (
                 <div key={label} className={`flex items-center gap-1.5 text-xs ${color}`}>
                   <Icon className="w-3 h-3" />{label}
