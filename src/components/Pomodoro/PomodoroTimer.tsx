@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Play, Pause, RotateCcw, AlertTriangle, ChevronRight, Leaf, ChevronDown } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Play, Pause, RotateCcw, AlertTriangle, ChevronRight, Leaf } from 'lucide-react'
 import { usePomodoro } from '../../hooks/usePomodoro'
 import { PomodoroMode, AttentionBudget, CATEGORY_COLORS } from '../../types'
 import { supabase } from '../../lib/supabase'
@@ -53,50 +53,55 @@ const CATEGORY_EMOJI: Record<string, string> = {
 export default function PomodoroTimer({ userId, date, onRunningChange }: Props) {
   const { state, start, pause, reset, abandon, addDistraction, setTask, switchMode } = usePomodoro(userId)
 
-  // Today's planned budget rows fetched from Supabase
-  const [budgets, setBudgets] = useState<AttentionBudget[]>([])
-  // Which budget row the user selected
+  const [budgets, setBudgets]           = useState<AttentionBudget[]>([])
+  const [budgetsLoaded, setBudgetsLoaded] = useState(false)   // ← FIX: guard against flash
   const [selectedBudgetId, setSelectedBudgetId] = useState<string>('')
-  // Optional free-text note within the category
-  const [taskNote, setTaskNote] = useState('')
-  // Whether the picker is locked (session is running)
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [taskNote, setTaskNote]         = useState('')
 
   const { mode, timeLeft, isRunning, cycles, distractions } = state
 
-  // Load today's budgets
-  useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase
-        .from('attention_budgets')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('date', date)
-        .order('created_at')
-      setBudgets(data ?? [])
-    }
-    load()
+  // ── Fetch budgets ─────────────────────────────────────────────────────────
+  // Extracted into a stable callback so we can call it both on mount AND
+  // after each completed cycle (to refresh hours_used).
+  const loadBudgets = useCallback(async () => {
+    const { data } = await supabase
+      .from('attention_budgets')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('date', date)
+      .order('created_at')
+    setBudgets(data ?? [])
+    setBudgetsLoaded(true)   // ← only show warning AFTER this resolves
   }, [userId, date])
 
-  // Whenever the selection changes, push it into the hook
+  // Initial load
+  useEffect(() => { loadBudgets() }, [loadBudgets])
+
+  // Re-fetch after every completed cycle so hours_used bar stays accurate.
+  // `cycles` increments in the reducer when a focus block completes.
+  useEffect(() => {
+    if (cycles > 0) loadBudgets()
+  }, [cycles, loadBudgets])
+
+  // Push selection into hook whenever it changes
   useEffect(() => {
     const row = budgets.find(b => b.id === selectedBudgetId) ?? null
     const label = row
       ? taskNote.trim() ? `${row.category} — ${taskNote.trim()}` : row.category
       : taskNote.trim()
     setTask(label, row?.category ?? null, row?.id ?? null)
-  }, [selectedBudgetId, taskNote, budgets, setTask])
+  }, [selectedBudgetId, taskNote, budgets])  // ← setTask intentionally omitted: it's stable (useCallback [])
 
   const selectedBudget = budgets.find(b => b.id === selectedBudgetId) ?? null
 
-  const handleStart = () => { start(); onRunningChange?.(true) }
-  const handlePause = () => { pause(); onRunningChange?.(false) }
+  const handleStart   = () => { start();   onRunningChange?.(true)  }
+  const handlePause   = () => { pause();   onRunningChange?.(false) }
   const handleAbandon = () => { abandon(); onRunningChange?.(false) }
 
-  const totalSeconds = DURATIONS[mode]
-  const progress = timeLeft / totalSeconds
-  const radius = 88
-  const circumference = 2 * Math.PI * radius
+  const totalSeconds     = DURATIONS[mode]
+  const progress         = timeLeft / totalSeconds
+  const radius           = 88
+  const circumference    = 2 * Math.PI * radius
   const strokeDashoffset = circumference * (1 - progress)
 
   const mins = String(Math.floor(timeLeft / 60)).padStart(2, '0')
@@ -142,7 +147,6 @@ export default function PomodoroTimer({ userId, date, onRunningChange }: Props) 
             {mins}:{secs}
           </span>
           <span className="text-gray-500 text-sm">{MODE_LABELS[mode]}</span>
-          {/* Show selected category + note inside the ring */}
           {selectedBudget && (
             <div className="flex items-center gap-1 mt-1">
               <span className="text-xs">{CATEGORY_EMOJI[selectedBudget.category] ?? '📌'}</span>
@@ -157,16 +161,20 @@ export default function PomodoroTimer({ userId, date, onRunningChange }: Props) 
         </div>
       </div>
 
-      {/* ── Focus picker (only shown in focus mode, locked while running) ── */}
+      {/* Focus picker — only in focus mode */}
       {mode === 'focus' && (
         <div className="w-full space-y-2">
 
-          {budgets.length > 0 ? (
-            // --- Budget category picker ---
+          {/* ── KEY FIX: only evaluate budgets.length after fetch has resolved.
+               Before `budgetsLoaded` is true, render nothing here so there
+               is zero chance of the warning flashing during re-renders. ── */}
+          {!budgetsLoaded ? (
+            // Skeleton while loading — prevents any flash of the warning
+            <div className="h-10 rounded-xl bg-gray-800 animate-pulse" />
+          ) : budgets.length > 0 ? (
             <div>
               <p className="text-gray-500 text-xs mb-1.5 px-1">What are you working on?</p>
               <div className="grid grid-cols-2 gap-1.5">
-                {/* "No category" option */}
                 <button
                   disabled={isRunning}
                   onClick={() => setSelectedBudgetId('')}
@@ -206,7 +214,7 @@ export default function PomodoroTimer({ userId, date, onRunningChange }: Props) 
               </div>
             </div>
           ) : (
-            // --- No plan yet: nudge to create one ---
+            // Only shown after fetch resolves with genuinely zero rows
             <div className="bg-amber-950/20 border border-amber-800/30 rounded-xl px-4 py-3">
               <p className="text-amber-300 text-xs leading-relaxed">
                 💡 You haven't set a plan for today yet. Go to <strong>Planner</strong> to allocate your hours — then this picker will show your categories.
@@ -214,7 +222,6 @@ export default function PomodoroTimer({ userId, date, onRunningChange }: Props) 
             </div>
           )}
 
-          {/* Optional specific task note */}
           <input
             type="text"
             placeholder={selectedBudget ? `Specific task within ${selectedBudget.category} (optional)` : 'Specific task (optional)'}
@@ -271,9 +278,9 @@ export default function PomodoroTimer({ userId, date, onRunningChange }: Props) 
       {/* Stats */}
       <div className="w-full grid grid-cols-3 gap-3">
         {[
-          { label: 'Cycles', value: cycles, color: 'text-indigo-400' },
-          { label: 'Distractions', value: distractions, color: distractions > 3 ? 'text-red-400' : 'text-yellow-400' },
-          { label: 'Focus Time', value: `${cycles * 25}m`, color: 'text-green-400' },
+          { label: 'Cycles',       value: cycles,           color: 'text-indigo-400' },
+          { label: 'Distractions', value: distractions,     color: distractions > 3 ? 'text-red-400' : 'text-yellow-400' },
+          { label: 'Focus Time',   value: `${cycles * 25}m`, color: 'text-green-400' },
         ].map(stat => (
           <div key={stat.label} className="bg-gray-800 rounded-xl p-3 text-center">
             <p className={`text-xl font-bold ${stat.color}`}>{stat.value}</p>
