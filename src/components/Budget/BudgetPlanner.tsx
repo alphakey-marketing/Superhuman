@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { Plus, Trash2, GripVertical, Clock, ChevronDown, ChevronUp, Info, Zap } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -57,7 +57,6 @@ const CATEGORY_META: Record<string, { emoji: string; what: string; examples: str
   },
 }
 
-// ─── Fragment Time Playbook ───────────────────────────────────────────────────
 const FRAGMENT_SLOTS = [
   {
     id: 'commute-to',
@@ -90,7 +89,7 @@ const FRAGMENT_SLOTS = [
     tactics: [
       'Music, ambient sounds, or a light entertainment podcast',
       'Avoid checking work emails — this extends your workday mentally',
-      'If walking: no headphones occasionally — let your mind wander (this is called "diffuse thinking" and helps creativity)',
+      'If walking: no headphones occasionally — let your mind wander (diffuse thinking helps creativity)',
       'Use this window to decide ONE thing you want to do when you get home',
     ],
     avoid: 'Heavy learning or work content — your cognitive tank is empty and retention drops to near zero.',
@@ -158,14 +157,14 @@ const FRAGMENT_SLOTS = [
     context: 'The post-lunch energy crash is biological — your body diverts blood to digestion. Cognitive performance dips for most people between 1:30–3 PM.',
     best: 'Admin, Meetings, or a Nap',
     bestEmoji: '📋',
-    why: 'Fighting the dip with deep work is the wrong move — you produce lower quality output and it frustrates you. Instead, schedule your lowest-cognitive tasks here (admin, meetings, replies) and save the afternoon recovery for a second deep work block at 4–6 PM.',
+    why: 'Fighting the dip with deep work is the wrong move — you produce lower quality output and it frustrates you. Instead, schedule your lowest-cognitive tasks here and save the afternoon for a second deep work block at 4–6 PM.',
     tactics: [
       'Block your calendar 1:30–3 PM for admin/meetings — don\'t fight the biology',
       'If you can: a 20-min nap (set alarm) gives you 3+ hours of extra alertness',
       'Walk again if you didn\'t at lunch — even 10 min helps',
       'Drink water — dehydration amplifies the dip',
     ],
-    avoid: 'Starting your most important deep work task during the dip — you\'ll struggle, produce worse work, and associate the task with difficulty.',
+    avoid: 'Starting your most important deep work task during the dip — you\'ll struggle and produce worse work.',
   },
 ]
 
@@ -262,13 +261,25 @@ export default function BudgetPlanner({ userId, date }: Props) {
   const [showFragments, setShowFragments] = useState(false)
   const [expandedFragment, setExpandedFragment] = useState<string | null>(null)
 
-  const totalAllocated = budgets.reduce((sum, b) => sum + b.hours_allocated, 0)
-  const totalUsed      = budgets.reduce((sum, b) => sum + b.hours_used, 0)
-  const freeHours      = Math.max(TOTAL_HOURS - totalAllocated, 0)
-  const isOverBudget   = totalAllocated + newHours > TOTAL_HOURS
+  // Track previous date so we can detect a day rollover
+  const prevDateRef = useRef(date)
+
+  const totalAllocated  = budgets.reduce((sum, b) => sum + b.hours_allocated, 0)
+  const totalUsed       = budgets.reduce((sum, b) => sum + b.hours_used, 0)
+  const freeHours       = Math.max(TOTAL_HOURS - totalAllocated, 0)
+  const isOverBudget    = totalAllocated + newHours > TOTAL_HOURS
   const isOverRealHours = totalAllocated > REAL_AVAILABLE_HOURS
 
   useEffect(() => {
+    // When the date changes (midnight rollover), wipe stale UI state immediately
+    if (prevDateRef.current !== date) {
+      prevDateRef.current = date
+      setBudgets([])
+      setShowTemplates(true)   // re-open template picker for the new day
+      setExpandedMeta(null)
+    }
+
+    setLoading(true)
     const fetchBudgets = async () => {
       const { data } = await supabase
         .from('attention_budgets')
@@ -277,6 +288,8 @@ export default function BudgetPlanner({ userId, date }: Props) {
         .eq('date', date)
         .order('created_at')
       setBudgets(data ?? [])
+      // If there are already budgets for today, keep templates collapsed
+      if ((data ?? []).length > 0) setShowTemplates(false)
       setLoading(false)
     }
     fetchBudgets()
@@ -381,7 +394,7 @@ export default function BudgetPlanner({ userId, date }: Props) {
         )}
       </div>
 
-      {/* ── Fragment Time Playbook ─────────────────────────────────────── */}
+      {/* Fragment Time Playbook */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
         <button
           onClick={() => setShowFragments(v => !v)}
@@ -394,7 +407,6 @@ export default function BudgetPlanner({ userId, date }: Props) {
           </div>
           {showFragments ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
         </button>
-
         {showFragments && (
           <div className="px-4 pb-4">
             <p className="text-gray-500 text-xs mb-4 leading-relaxed">
@@ -422,7 +434,6 @@ export default function BudgetPlanner({ userId, date }: Props) {
                       ? <ChevronUp className="w-4 h-4 text-gray-500 flex-shrink-0" />
                       : <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />}
                   </button>
-
                   {expandedFragment === slot.id && (
                     <div className="px-4 pb-4 pt-1 bg-gray-800/30 border-t border-gray-700/50 space-y-3">
                       <div className="text-gray-500 text-xs leading-relaxed italic">{slot.context}</div>
@@ -515,19 +526,15 @@ export default function BudgetPlanner({ userId, date }: Props) {
           </div>
           <div className="h-5 bg-gray-800 rounded-full overflow-hidden flex">
             {budgets.map(b => (
-              <div
-                key={b.id}
+              <div key={b.id}
                 style={{ width: `${(b.hours_allocated / TOTAL_HOURS) * 100}%`, backgroundColor: b.color }}
                 title={`${b.category}: ${b.hours_allocated}h`}
-                className="transition-all duration-300 first:rounded-l-full"
-              />
+                className="transition-all duration-300 first:rounded-l-full" />
             ))}
             {freeHours > 0 && (
-              <div
-                style={{ width: `${(freeHours / TOTAL_HOURS) * 100}%` }}
+              <div style={{ width: `${(freeHours / TOTAL_HOURS) * 100}%` }}
                 className="bg-gray-700/50 last:rounded-r-full"
-                title={`Unallocated: ${freeHours.toFixed(1)}h`}
-              />
+                title={`Unallocated: ${freeHours.toFixed(1)}h`} />
             )}
           </div>
           <div className="flex flex-wrap gap-3 mt-2">
@@ -563,9 +570,7 @@ export default function BudgetPlanner({ userId, date }: Props) {
                 return (
                   <Draggable key={budget.id} draggableId={budget.id} index={index}>
                     {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
+                      <div ref={provided.innerRef} {...provided.draggableProps}
                         className={`bg-gray-800 rounded-xl border transition-all ${
                           snapshot.isDragging
                             ? 'border-indigo-500 shadow-lg shadow-indigo-500/10 scale-[1.01]'
@@ -583,16 +588,13 @@ export default function BudgetPlanner({ userId, date }: Props) {
                               <button
                                 onClick={() => setExpandedMeta(expandedMeta === budget.category ? null : budget.category)}
                                 className="text-gray-600 hover:text-indigo-400 transition-colors"
-                                title="What does this mean?"
-                              >
+                                title="What does this mean?">
                                 <Info className="w-3 h-3" />
                               </button>
                             </div>
                             <div className="mt-1.5 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                              <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{ width: `${Math.min((budget.hours_used / budget.hours_allocated) * 100, 100)}%`, backgroundColor: budget.color }}
-                              />
+                              <div className="h-full rounded-full transition-all duration-500"
+                                style={{ width: `${Math.min((budget.hours_used / budget.hours_allocated) * 100, 100)}%`, backgroundColor: budget.color }} />
                             </div>
                           </div>
                           <span className="text-gray-400 text-xs whitespace-nowrap">
@@ -625,29 +627,20 @@ export default function BudgetPlanner({ userId, date }: Props) {
       <div>
         <p className="text-gray-600 text-xs mb-2 px-1">Or add manually:</p>
         <div className="flex items-center gap-2 bg-gray-800/40 rounded-xl p-3 border border-gray-700 border-dashed">
-          <select
-            value={newCategory}
-            onChange={e => setNewCategory(e.target.value)}
-            className="flex-1 bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-700 outline-none cursor-pointer"
-          >
+          <select value={newCategory} onChange={e => setNewCategory(e.target.value)}
+            className="flex-1 bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-700 outline-none cursor-pointer">
             {CATEGORIES.map(c => (
               <option key={c} value={c}>{CATEGORY_META[c]?.emoji ?? ''} {c}</option>
             ))}
           </select>
           <div className="flex items-center gap-1">
-            <input
-              type="number" min={0.5} max={16} step={0.5}
-              value={newHours}
+            <input type="number" min={0.5} max={16} step={0.5} value={newHours}
               onChange={e => setNewHours(Number(e.target.value))}
-              className="w-16 bg-gray-800 text-white text-sm px-2 py-2 rounded-lg border border-gray-700 outline-none text-center"
-            />
+              className="w-16 bg-gray-800 text-white text-sm px-2 py-2 rounded-lg border border-gray-700 outline-none text-center" />
             <span className="text-gray-500 text-sm">h</span>
           </div>
-          <button
-            onClick={addBudget}
-            disabled={isOverBudget || saving}
-            className="p-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex-shrink-0"
-          >
+          <button onClick={addBudget} disabled={isOverBudget || saving}
+            className="p-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex-shrink-0">
             {saving
               ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
               : <Plus className="w-4 h-4" />}
