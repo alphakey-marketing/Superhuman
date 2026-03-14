@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronUp, Zap, Target, Clock, Star } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronUp, Zap, Target, Clock, Star, AlertCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { PracticeSkill, PracticeSession, SKILL_COLORS } from '../../types'
 
@@ -41,6 +41,7 @@ export default function PracticeTracker({ userId }: Props) {
   const [expandedSkill, setExpandedSkill] = useState<string | null>(null)
   const [showAddSkill, setShowAddSkill] = useState(false)
   const [showLogSession, setShowLogSession] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   // New skill form
   const [newSkillName, setNewSkillName] = useState('')
@@ -59,10 +60,12 @@ export default function PracticeTracker({ userId }: Props) {
   }, [userId])
 
   const loadData = async () => {
-    const [{ data: sk }, { data: se }] = await Promise.all([
+    const [{ data: sk, error: skErr }, { data: se, error: seErr }] = await Promise.all([
       supabase.from('practice_skills').select('*').eq('user_id', userId).order('created_at'),
       supabase.from('practice_sessions').select('*').eq('user_id', userId).order('date', { ascending: false }),
     ])
+    if (skErr) { setError(`Failed to load skills: ${skErr.message}`); setLoading(false); return }
+    if (seErr) { setError(`Failed to load sessions: ${seErr.message}`); setLoading(false); return }
     setSkills(sk ?? [])
     setSessions(se ?? [])
     setLoading(false)
@@ -70,28 +73,39 @@ export default function PracticeTracker({ userId }: Props) {
 
   const addSkill = async () => {
     if (!newSkillName.trim()) return
-    const { data } = await supabase.from('practice_skills').insert({
+    setError(null)
+    const { data, error: insertErr } = await supabase.from('practice_skills').insert({
       user_id: userId,
       name: newSkillName.trim(),
       category: newSkillCategory,
       color: newSkillColor,
       target_hours: newSkillTarget,
+      total_hours: 0,
     }).select().single()
-    if (data) {
-      setSkills(prev => [...prev, data])
-      setNewSkillName('')
-      setShowAddSkill(false)
+
+    if (insertErr) {
+      setError(`Could not add skill: ${insertErr.message} (code: ${insertErr.code})`)
+      return
     }
+    if (!data) {
+      setError('Could not add skill: insert returned no data. Check your Supabase RLS policies for practice_skills.')
+      return
+    }
+    setSkills(prev => [...prev, data])
+    setNewSkillName('')
+    setShowAddSkill(false)
   }
 
   const deleteSkill = async (id: string) => {
-    await supabase.from('practice_skills').delete().eq('id', id)
+    const { error: delErr } = await supabase.from('practice_skills').delete().eq('id', id)
+    if (delErr) { setError(`Could not delete skill: ${delErr.message}`); return }
     setSkills(prev => prev.filter(s => s.id !== id))
     setSessions(prev => prev.filter(s => s.skill_id !== id))
   }
 
   const logSession = async (skillId: string) => {
-    const { data } = await supabase.from('practice_sessions').insert({
+    setError(null)
+    const { data: sessionData, error: sessionErr } = await supabase.from('practice_sessions').insert({
       user_id: userId,
       skill_id: skillId,
       date: new Date().toISOString().split('T')[0],
@@ -100,17 +114,47 @@ export default function PracticeTracker({ userId }: Props) {
       quality: sessionQuality,
       notes: sessionNotes.trim() || null,
     }).select().single()
-    if (data) {
-      setSessions(prev => [data, ...prev])
-      // Refresh skill total_hours (trigger updates it in DB)
-      const { data: sk } = await supabase.from('practice_skills').select('*').eq('id', skillId).single()
-      if (sk) setSkills(prev => prev.map(s => s.id === skillId ? sk : s))
-      setShowLogSession(null)
-      setSessionNotes('')
-      setSessionMins(30)
-      setSessionDifficulty(3)
-      setSessionQuality(3)
+
+    if (sessionErr) {
+      setError(`Could not log session: ${sessionErr.message} (code: ${sessionErr.code})`)
+      return
     }
+    if (!sessionData) {
+      setError('Could not log session: insert returned no data. Check your Supabase RLS policies for practice_sessions.')
+      return
+    }
+
+    setSessions(prev => [sessionData, ...prev])
+
+    // Try to refresh from DB (relies on trigger). If trigger absent, fall back to client-side sum.
+    const { data: sk, error: skErr } = await supabase
+      .from('practice_skills')
+      .select('*')
+      .eq('id', skillId)
+      .single()
+
+    if (sk && !skErr) {
+      // Check if DB trigger updated total_hours; if not, compute client-side
+      const allSessions = [sessionData, ...sessions.filter(s => s.skill_id === skillId)]
+      const clientTotal = allSessions.reduce((sum, s) => sum + s.duration_minutes, 0) / 60
+      const dbTotal = Number(sk.total_hours)
+      // If DB total didn't increase, the trigger is missing — use client total
+      const skill = skills.find(s => s.id === skillId)
+      const prevTotal = skill ? Number(skill.total_hours) : 0
+      const updatedTotal = dbTotal > prevTotal ? dbTotal : clientTotal
+      setSkills(prev => prev.map(s => s.id === skillId ? { ...sk, total_hours: updatedTotal } : s))
+    } else {
+      // DB read failed — compute entirely client-side
+      const allSessions = [sessionData, ...sessions.filter(s => s.skill_id === skillId)]
+      const clientTotal = allSessions.reduce((sum, s) => sum + s.duration_minutes, 0) / 60
+      setSkills(prev => prev.map(s => s.id === skillId ? { ...s, total_hours: clientTotal } : s))
+    }
+
+    setShowLogSession(null)
+    setSessionNotes('')
+    setSessionMins(30)
+    setSessionDifficulty(3)
+    setSessionQuality(3)
   }
 
   const totalHoursAllSkills = skills.reduce((sum, s) => sum + Number(s.total_hours), 0)
@@ -126,6 +170,15 @@ export default function PracticeTracker({ userId }: Props) {
 
   return (
     <div className="space-y-5">
+
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-start gap-2.5 bg-red-950/60 border border-red-800/60 rounded-xl px-4 py-3">
+          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+          <p className="text-red-300 text-sm">{error}</p>
+          <button onClick={() => setError(null)} className="ml-auto text-red-500 hover:text-red-300 text-xs">✕</button>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
