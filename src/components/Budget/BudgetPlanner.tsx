@@ -45,11 +45,19 @@ const CATEGORY_META: Record<string, { emoji: string; what: string; examples: str
     what: 'Meaningful connection with people — family, friends, networking.',
     examples: 'Dinner with family, catching up with friends, team bonding, mentoring',
   },
+  'Entertainment': {
+    emoji: '🎮',
+    what: 'Leisure and enjoyment — guilt-free time to do what you love.',
+    examples: 'Movies, games, YouTube, music, reading for fun, hobbies',
+  },
+  'Meals': {
+    emoji: '🍽️',
+    what: 'Time set aside for eating — breakfast, lunch, dinner, and any snacks.',
+    examples: 'Cooking, sitting down for meals, meal prep, grabbing food out',
+  },
 }
 
 // ─── Fragment Time Playbook ───────────────────────────────────────────────────
-// These are the "in-between" micro-windows that most people waste.
-// Each entry teaches the user the best use of that specific window.
 const FRAGMENT_SLOTS = [
   {
     id: 'commute-to',
@@ -168,11 +176,12 @@ const DAY_TEMPLATES = [
     desc: 'Balanced day at work — deep focus in AM, admin in PM',
     tip: 'Your brain is sharpest 9–12. Protect that window for Deep Work.',
     allocations: [
-      { category: 'Deep Work', hours: 3 },
-      { category: 'Admin',     hours: 2 },
-      { category: 'Learning',  hours: 1 },
-      { category: 'Exercise',  hours: 0.5 },
-      { category: 'Rest',      hours: 0.5 },
+      { category: 'Deep Work',    hours: 3 },
+      { category: 'Admin',        hours: 2 },
+      { category: 'Learning',     hours: 1 },
+      { category: 'Meals',        hours: 1.5 },
+      { category: 'Exercise',     hours: 0.5 },
+      { category: 'Rest',         hours: 0.5 },
     ],
   },
   {
@@ -181,23 +190,24 @@ const DAY_TEMPLATES = [
     desc: 'Max output — protect your best hours ruthlessly',
     tip: 'Block your calendar, mute notifications, and go deep for 4+ hours.',
     allocations: [
-      { category: 'Deep Work', hours: 4.5 },
-      { category: 'Admin',     hours: 1 },
-      { category: 'Exercise',  hours: 0.5 },
-      { category: 'Rest',      hours: 0.5 },
+      { category: 'Deep Work',    hours: 4.5 },
+      { category: 'Admin',        hours: 1 },
+      { category: 'Meals',        hours: 1.5 },
+      { category: 'Exercise',     hours: 0.5 },
+      { category: 'Rest',         hours: 0.5 },
     ],
   },
   {
-    id: 'creative',
-    label: '🎨 Creative Day',
-    desc: 'Side project, design, or creative work alongside office hours',
-    tip: 'Use your lunch + evening for creative flow. AM for office deep work.',
+    id: 'home',
+    label: '🏠 Home Day',
+    desc: 'Off day — rest, fun, family, movement. Zero work guilt.',
+    tip: 'You recharge best when you fully disconnect. One day off makes the next five days better.',
     allocations: [
-      { category: 'Deep Work', hours: 2 },
-      { category: 'Creative',  hours: 2.5 },
-      { category: 'Admin',     hours: 1 },
-      { category: 'Learning',  hours: 0.5 },
-      { category: 'Exercise',  hours: 0.5 },
+      { category: 'Entertainment', hours: 3 },
+      { category: 'Rest',          hours: 2 },
+      { category: 'Exercise',      hours: 1 },
+      { category: 'Social',        hours: 2 },
+      { category: 'Meals',         hours: 1.5 },
     ],
   },
   {
@@ -206,11 +216,12 @@ const DAY_TEMPLATES = [
     desc: 'Prioritise skill-building and knowledge absorption',
     tip: 'Use commute time for audio learning. Evening for active practice.',
     allocations: [
-      { category: 'Deep Work', hours: 2 },
-      { category: 'Learning',  hours: 2.5 },
-      { category: 'Admin',     hours: 1 },
-      { category: 'Exercise',  hours: 0.5 },
-      { category: 'Rest',      hours: 0.5 },
+      { category: 'Deep Work',    hours: 2 },
+      { category: 'Learning',     hours: 2.5 },
+      { category: 'Admin',        hours: 1 },
+      { category: 'Meals',        hours: 1.5 },
+      { category: 'Exercise',     hours: 0.5 },
+      { category: 'Rest',         hours: 0.5 },
     ],
   },
   {
@@ -219,41 +230,42 @@ const DAY_TEMPLATES = [
     desc: "Low intensity — when you're tired or need to recharge",
     tip: 'Even on recovery days, 1h of real focus moves the needle.',
     allocations: [
-      { category: 'Admin',     hours: 2 },
-      { category: 'Deep Work', hours: 1 },
-      { category: 'Exercise',  hours: 1 },
-      { category: 'Rest',      hours: 2 },
-      { category: 'Social',    hours: 0.5 },
+      { category: 'Admin',        hours: 2 },
+      { category: 'Deep Work',    hours: 1 },
+      { category: 'Exercise',     hours: 1 },
+      { category: 'Rest',         hours: 2 },
+      { category: 'Meals',        hours: 1.5 },
+      { category: 'Social',       hours: 0.5 },
     ],
   },
 ]
 
 const AVAILABLE_BLOCKS = [
   { label: 'Morning focus (9–12:30)', hours: 3.5 },
-  { label: 'Lunch break (12:30–2)', hours: 1.5 },
-  { label: 'Afternoon (2–6)', hours: 4 },
-  { label: 'Evening at home (7–10)', hours: 3 },
+  { label: 'Lunch break (12:30–2)',   hours: 1.5 },
+  { label: 'Afternoon (2–6)',         hours: 4 },
+  { label: 'Evening at home (7–10)',  hours: 3 },
 ]
 const REAL_AVAILABLE_HOURS = AVAILABLE_BLOCKS.reduce((s, b) => s + b.hours, 0)
 const TOTAL_HOURS = 16
 const CATEGORIES = Object.keys(CATEGORY_COLORS)
 
 export default function BudgetPlanner({ userId, date }: Props) {
-  const [budgets, setBudgets] = useState<AttentionBudget[]>([])
-  const [newCategory, setNewCategory] = useState(CATEGORIES[0])
-  const [newHours, setNewHours] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [budgets, setBudgets]             = useState<AttentionBudget[]>([])
+  const [newCategory, setNewCategory]     = useState(CATEGORIES[0])
+  const [newHours, setNewHours]           = useState(1)
+  const [loading, setLoading]             = useState(true)
+  const [saving, setSaving]               = useState(false)
   const [applyingTemplate, setApplyingTemplate] = useState(false)
-  const [expandedMeta, setExpandedMeta] = useState<string | null>(null)
+  const [expandedMeta, setExpandedMeta]   = useState<string | null>(null)
   const [showTemplates, setShowTemplates] = useState(true)
   const [showFragments, setShowFragments] = useState(false)
   const [expandedFragment, setExpandedFragment] = useState<string | null>(null)
 
   const totalAllocated = budgets.reduce((sum, b) => sum + b.hours_allocated, 0)
-  const totalUsed = budgets.reduce((sum, b) => sum + b.hours_used, 0)
-  const freeHours = Math.max(TOTAL_HOURS - totalAllocated, 0)
-  const isOverBudget = totalAllocated + newHours > TOTAL_HOURS
+  const totalUsed      = budgets.reduce((sum, b) => sum + b.hours_used, 0)
+  const freeHours      = Math.max(TOTAL_HOURS - totalAllocated, 0)
+  const isOverBudget   = totalAllocated + newHours > TOTAL_HOURS
   const isOverRealHours = totalAllocated > REAL_AVAILABLE_HOURS
 
   useEffect(() => {
@@ -391,7 +403,6 @@ export default function BudgetPlanner({ userId, date }: Props) {
             <div className="space-y-2">
               {FRAGMENT_SLOTS.map(slot => (
                 <div key={slot.id} className="rounded-xl border border-gray-700 overflow-hidden">
-                  {/* Header row */}
                   <button
                     onClick={() => setExpandedFragment(expandedFragment === slot.id ? null : slot.id)}
                     className="w-full flex items-center gap-3 px-3.5 py-3 hover:bg-gray-800/60 transition-colors text-left"
@@ -412,21 +423,13 @@ export default function BudgetPlanner({ userId, date }: Props) {
                       : <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />}
                   </button>
 
-                  {/* Expanded content */}
                   {expandedFragment === slot.id && (
                     <div className="px-4 pb-4 pt-1 bg-gray-800/30 border-t border-gray-700/50 space-y-3">
-                      {/* Context */}
-                      <div className="text-gray-500 text-xs leading-relaxed italic">
-                        {slot.context}
-                      </div>
-
-                      {/* Why this works */}
+                      <div className="text-gray-500 text-xs leading-relaxed italic">{slot.context}</div>
                       <div className="bg-gray-900 rounded-xl p-3 border border-gray-700">
                         <p className="text-xs font-semibold mb-1" style={{ color: slot.color }}>💡 Why this works</p>
                         <p className="text-gray-300 text-xs leading-relaxed">{slot.why}</p>
                       </div>
-
-                      {/* Tactics */}
                       <div>
                         <p className="text-gray-400 text-xs font-semibold mb-2">✅ Tactics</p>
                         <div className="space-y-1.5">
@@ -438,8 +441,6 @@ export default function BudgetPlanner({ userId, date }: Props) {
                           ))}
                         </div>
                       </div>
-
-                      {/* Avoid */}
                       <div className="bg-red-950/20 border border-red-900/30 rounded-xl p-3">
                         <p className="text-red-400 text-xs font-semibold mb-1">🚫 Avoid</p>
                         <p className="text-gray-400 text-xs leading-relaxed">{slot.avoid}</p>
@@ -661,9 +662,9 @@ export default function BudgetPlanner({ userId, date }: Props) {
       {budgets.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'Planned', value: `${totalAllocated.toFixed(1)}h`, color: 'text-indigo-400' },
-            { label: 'Used Today', value: `${totalUsed.toFixed(1)}h`, color: 'text-green-400' },
-            { label: 'Free', value: `${freeHours.toFixed(1)}h`, color: 'text-yellow-400' },
+            { label: 'Planned',    value: `${totalAllocated.toFixed(1)}h`, color: 'text-indigo-400' },
+            { label: 'Used Today', value: `${totalUsed.toFixed(1)}h`,      color: 'text-green-400' },
+            { label: 'Free',       value: `${freeHours.toFixed(1)}h`,      color: 'text-yellow-400' },
           ].map(stat => (
             <div key={stat.label} className="bg-gray-800 rounded-xl p-3.5 text-center">
               <p className={`text-xl font-bold ${stat.color}`}>{stat.value}</p>
