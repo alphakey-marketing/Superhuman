@@ -96,13 +96,15 @@ export const BREAK_DURATIONS = {
 }
 
 export const CATEGORY_COLORS: Record<string, string> = {
-  'Deep Work': '#6366f1',
-  'Learning':  '#f59e0b',
-  'Creative':  '#ec4899',
-  'Admin':     '#10b981',
-  'Exercise':  '#3b82f6',
-  'Rest':      '#8b5cf6',
-  'Social':    '#f97316',
+  'Deep Work':     '#6366f1',
+  'Learning':      '#f59e0b',
+  'Creative':      '#ec4899',
+  'Admin':         '#10b981',
+  'Exercise':      '#3b82f6',
+  'Rest':          '#8b5cf6',
+  'Social':        '#f97316',
+  'Entertainment': '#14b8a6',
+  'Meals':         '#84cc16',
 }
 
 export const SKILL_COLORS = [
@@ -114,27 +116,27 @@ export const SKILL_COLORS = [
 export const VAULT_TYPES: Record<MotivationEntry['type'], { label: string; emoji: string; placeholder: string }> = {
   proof_them_wrong: {
     label: 'Prove Them Wrong',
-    emoji: '🔥',
+    emoji: '\uD83D\uDD25',
     placeholder: 'They said I couldn\'t. Every rep I do proves them wrong.',
   },
   identity: {
     label: 'Identity Statement',
-    emoji: '👑',
+    emoji: '\uD83D\uDC51',
     placeholder: 'I am the kind of person who shows up every single day, no matter what.',
   },
   why: {
     label: 'My Why',
-    emoji: '💎',
+    emoji: '\uD83D\uDC8E',
     placeholder: 'I do this for my family. To give them the life they deserve.',
   },
   milestone: {
     label: 'Milestone Unlocked',
-    emoji: '🏆',
+    emoji: '\uD83C\uDFC6',
     placeholder: '100 hours of deep work logged. The compound interest is real.',
   },
   custom: {
     label: 'Custom Note',
-    emoji: '✍️',
+    emoji: '\u270D\uFE0F',
     placeholder: 'Write anything that fires you up...',
   },
 }
