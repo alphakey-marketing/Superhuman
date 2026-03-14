@@ -61,6 +61,7 @@ export interface PracticeSession {
   id: string
   user_id: string
   skill_id: string
+  sub_skill_id: string | null
   date: string
   duration_minutes: number
   difficulty: number
