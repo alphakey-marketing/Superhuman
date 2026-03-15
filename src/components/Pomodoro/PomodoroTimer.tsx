@@ -8,7 +8,6 @@ interface Props {
   userId: string
   date: string
   onRunningChange?: (running: boolean) => void
-  // Bubbles current timeLeft up to App so the header mini-pill stays accurate
   onTimeLeftChange?: (timeLeft: number | null) => void
 }
 
@@ -42,14 +41,17 @@ const DURATIONS: Record<PomodoroMode, number> = {
   long_break: 15 * 60,
 }
 
+// Kept in sync with CATEGORY_COLORS in types/index.ts
 const CATEGORY_EMOJI: Record<string, string> = {
-  'Deep Work': '🧠',
-  'Learning':  '📚',
-  'Creative':  '🎨',
-  'Admin':     '📋',
-  'Exercise':  '💪',
-  'Rest':      '😴',
-  'Social':    '🤝',
+  'Deep Work':     '🧠',
+  'Learning':      '📚',
+  'Creative':      '🎨',
+  'Admin':         '📋',
+  'Exercise':      '💪',
+  'Rest':          '😴',
+  'Social':        '🤝',
+  'Entertainment': '🎮',
+  'Meals':         '🍽️',
 }
 
 export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLeftChange }: Props) {
@@ -62,12 +64,12 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
 
   const { mode, timeLeft, isRunning, cycles, distractions } = state
 
-  // ── Bubble timeLeft up so the header mini-pill is always live ───────────────
+  // Bubble timeLeft up so the header mini-pill is always live
   useEffect(() => {
     onTimeLeftChange?.(isRunning ? timeLeft : null)
   }, [timeLeft, isRunning, onTimeLeftChange])
 
-  // ── Budget fetch ─────────────────────────────────────────────────────────────
+  // Budget fetch
   const loadBudgets = useCallback(async () => {
     const { data } = await supabase
       .from('attention_budgets')
@@ -79,10 +81,29 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
     setBudgetsLoaded(true)
   }, [userId, date])
 
-  useEffect(() => { loadBudgets() }, [loadBudgets])
+  // Initial load + re-load when date changes
+  useEffect(() => {
+    setBudgetsLoaded(false)
+    setBudgets([])
+    loadBudgets()
+  }, [loadBudgets])
 
-  // Re-fetch after each cycle to keep hours_used accurate
+  // Re-fetch after each completed cycle to keep hours_used accurate
   useEffect(() => { if (cycles > 0) loadBudgets() }, [cycles, loadBudgets])
+
+  // Re-fetch whenever the user comes back to this tab from the Planner
+  // (covers the case where a template was applied while Timer tab was hidden)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !isRunning) loadBudgets()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [loadBudgets, isRunning])
 
   // Push selection into hook
   useEffect(() => {
@@ -212,7 +233,7 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
           ) : (
             <div className="bg-amber-950/20 border border-amber-800/30 rounded-xl px-4 py-3">
               <p className="text-amber-300 text-xs leading-relaxed">
-                💡 You haven't set a plan for today yet. Go to <strong>Planner</strong> to allocate your hours — then this picker will show your categories.
+                💡 You haven’t set a plan for today yet. Go to <strong>Planner</strong> to allocate your hours — then this picker will show your categories.
               </p>
             </div>
           )}
