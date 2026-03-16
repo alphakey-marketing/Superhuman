@@ -55,14 +55,15 @@ const CATEGORY_EMOJI: Record<string, string> = {
 }
 
 export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLeftChange }: Props) {
-  const { state, start, pause, reset, abandon, addDistraction, setTask, switchMode } = usePomodoro(userId)
+  // Pass date into the hook so hydration re-runs on midnight rollover
+  const { state, start, pause, reset, abandon, addDistraction, setTask, switchMode } = usePomodoro(userId, date)
 
   const [budgets, setBudgets]             = useState<AttentionBudget[]>([])
   const [budgetsLoaded, setBudgetsLoaded] = useState(false)
   const [selectedBudgetId, setSelectedBudgetId] = useState<string>('')
   const [taskNote, setTaskNote]           = useState('')
 
-  const { mode, timeLeft, isRunning, cycles, distractions } = state
+  const { mode, timeLeft, isRunning, cycles, distractions, sessionDistractions } = state
 
   // Bubble timeLeft up so the header mini-pill is always live
   useEffect(() => {
@@ -81,7 +82,7 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
     setBudgetsLoaded(true)
   }, [userId, date])
 
-  // Initial load + re-load when date changes
+  // Initial load + reset on date change
   useEffect(() => {
     setBudgetsLoaded(false)
     setBudgets([])
@@ -91,8 +92,7 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
   // Re-fetch after each completed cycle to keep hours_used accurate
   useEffect(() => { if (cycles > 0) loadBudgets() }, [cycles, loadBudgets])
 
-  // Re-fetch whenever the user comes back to this tab from the Planner
-  // (covers the case where a template was applied while Timer tab was hidden)
+  // Re-fetch when user returns to this tab from Planner (template applied)
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible' && !isRunning) loadBudgets()
@@ -278,7 +278,7 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
         </button>
       </div>
 
-      {/* Cycle dots */}
+      {/* Cycle dots — reflect total cycles today */}
       <div className="flex items-center gap-2">
         {Array.from({ length: 4 }).map((_, i) => (
           <div
@@ -291,12 +291,12 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
         {cycles >= 4 && <span className="text-gray-500 text-xs ml-1">×{Math.floor(cycles / 4) + 1}</span>}
       </div>
 
-      {/* Stats */}
+      {/* Stats — cycles + total distractions today + focus time */}
       <div className="w-full grid grid-cols-3 gap-3">
         {[
-          { label: 'Cycles',       value: cycles,            color: 'text-indigo-400' },
-          { label: 'Distractions', value: distractions,      color: distractions > 3 ? 'text-red-400' : 'text-yellow-400' },
-          { label: 'Focus Time',   value: `${cycles * 25}m`, color: 'text-green-400' },
+          { label: 'Cycles Today',  value: cycles,            color: 'text-indigo-400' },
+          { label: 'Distractions',  value: distractions,      color: distractions > 3 ? 'text-red-400' : 'text-yellow-400' },
+          { label: 'Focus Time',    value: `${cycles * 25}m`, color: 'text-green-400' },
         ].map(stat => (
           <div key={stat.label} className="bg-gray-800 rounded-xl p-3 text-center">
             <p className={`text-xl font-bold ${stat.color}`}>{stat.value}</p>
@@ -305,12 +305,12 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
         ))}
       </div>
 
-      {/* Distraction tip */}
-      {distractions > 0 && mode === 'focus' && (
+      {/* Distraction tip — uses sessionDistractions so it only shows for the current session */}
+      {sessionDistractions > 0 && mode === 'focus' && (
         <div className="flex items-start gap-2 bg-yellow-900/20 border border-yellow-800/40 rounded-xl px-4 py-3 w-full">
           <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
           <p className="text-yellow-300/80 text-xs">
-            {distractions} distraction{distractions > 1 ? 's' : ''} logged. Each costs ~23min to regain deep focus. Try a restoration break after this session.
+            {sessionDistractions} distraction{sessionDistractions > 1 ? 's' : ''} this session. Each costs ~23min to regain deep focus. Try a restoration break after this session.
           </p>
         </div>
       )}

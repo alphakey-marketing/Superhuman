@@ -6,14 +6,14 @@ interface PomodoroState {
   mode: PomodoroMode
   timeLeft: number
   isRunning: boolean
-  cycles: number
-  distractions: number
+  cycles: number              // total completed cycles today (hydrated from DB on mount)
+  distractions: number        // total distractions today
+  sessionDistractions: number // distractions in the CURRENT session only (for the tip banner)
   taskLabel: string
-  // The budget category the user is working on (e.g. "Deep Work", "Admin")
   budgetCategory: string | null
-  // The Supabase row id of the matching attention_budget so we can increment hours_used
   budgetRowId: string | null
   sessionId: string | null
+  hydrated: boolean           // true once the DB seed has resolved
 }
 
 type PomodoroAction =
@@ -25,6 +25,7 @@ type PomodoroAction =
   | { type: 'ADD_DISTRACTION' }
   | { type: 'SET_TASK'; label: string; budgetCategory: string | null; budgetRowId: string | null }
   | { type: 'SET_SESSION_ID'; id: string }
+  | { type: 'HYDRATE'; cycles: number; distractions: number }
 
 function reducer(state: PomodoroState, action: PomodoroAction): PomodoroState {
   switch (action.type) {
@@ -38,6 +39,7 @@ function reducer(state: PomodoroState, action: PomodoroAction): PomodoroState {
         isRunning: false,
         timeLeft: POMODORO_DURATIONS[state.mode],
         sessionId: null,
+        sessionDistractions: 0,
       }
     case 'SET_TIME_LEFT':
       return { ...state, timeLeft: action.timeLeft }
@@ -49,9 +51,14 @@ function reducer(state: PomodoroState, action: PomodoroAction): PomodoroState {
         isRunning: false,
         cycles: action.mode !== 'focus' ? state.cycles + 1 : state.cycles,
         sessionId: null,
+        sessionDistractions: 0,
       }
     case 'ADD_DISTRACTION':
-      return { ...state, distractions: state.distractions + 1 }
+      return {
+        ...state,
+        distractions: state.distractions + 1,
+        sessionDistractions: state.sessionDistractions + 1,
+      }
     case 'SET_TASK':
       return {
         ...state,
@@ -61,6 +68,15 @@ function reducer(state: PomodoroState, action: PomodoroAction): PomodoroState {
       }
     case 'SET_SESSION_ID':
       return { ...state, sessionId: action.id }
+    case 'HYDRATE':
+      // Only seed if no session is running and we haven't already hydrated
+      if (state.isRunning || state.hydrated) return state
+      return {
+        ...state,
+        cycles: action.cycles,
+        distractions: action.distractions,
+        hydrated: true,
+      }
     default:
       return state
   }
@@ -91,17 +107,19 @@ function notify(title: string, body: string) {
   }
 }
 
-export function usePomodoro(userId: string | undefined) {
+export function usePomodoro(userId: string | undefined, date: string) {
   const [state, dispatch] = useReducer(reducer, {
     mode: 'focus',
     timeLeft: POMODORO_DURATIONS.focus,
     isRunning: false,
     cycles: 0,
     distractions: 0,
+    sessionDistractions: 0,
     taskLabel: '',
     budgetCategory: null,
     budgetRowId: null,
     sessionId: null,
+    hydrated: false,
   })
 
   const timerRef             = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -109,6 +127,23 @@ export function usePomodoro(userId: string | undefined) {
   stateRef.current           = state
   const startEpochRef        = useRef<number | null>(null)
   const elapsedAtPauseRef    = useRef<number>(0)
+
+  // ── Hydrate cycles + distractions from DB on mount / date change ────────────
+  useEffect(() => {
+    if (!userId) return
+    const hydrate = async () => {
+      const { data } = await supabase
+        .from('pomodoro_sessions')
+        .select('completed_cycles, distractions_count')
+        .eq('user_id', userId)
+        .eq('status', 'completed')
+        .gte('started_at', date + 'T00:00:00')
+      const cycles      = data?.reduce((s, r) => s + (r.completed_cycles ?? 0), 0) ?? 0
+      const distractions = data?.reduce((s, r) => s + (r.distractions_count ?? 0), 0) ?? 0
+      dispatch({ type: 'HYDRATE', cycles, distractions })
+    }
+    hydrate()
+  }, [userId, date])
 
   const handleComplete = useCallback(async () => {
     const s = stateRef.current
