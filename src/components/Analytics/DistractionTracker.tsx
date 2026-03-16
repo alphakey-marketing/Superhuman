@@ -6,6 +6,7 @@ import { DistractionEvent } from '../../types'
 
 interface Props {
   userId: string
+  today: string  // passed from App so it updates on midnight rollover
 }
 
 const TOOLTIP_STYLE = {
@@ -17,13 +18,15 @@ const TOOLTIP_STYLE = {
   fontWeight: '600',
 }
 
-export default function DistractionTracker({ userId }: Props) {
+export default function DistractionTracker({ userId, today }: Props) {
   const [events, setEvents] = useState<DistractionEvent[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetch = async () => {
-      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString()
+    setLoading(true)
+    setEvents([])
+    const load = async () => {
+      const weekAgo = new Date(new Date(today).getTime() - 7 * 86400000).toISOString()
       const { data } = await supabase
         .from('distraction_events')
         .select('*')
@@ -33,7 +36,7 @@ export default function DistractionTracker({ userId }: Props) {
       setEvents(data ?? [])
       setLoading(false)
     }
-    fetch()
+    load()
 
     // Realtime subscription for live updates
     const sub = supabase
@@ -49,11 +52,11 @@ export default function DistractionTracker({ userId }: Props) {
       .subscribe()
 
     return () => { supabase.removeChannel(sub) }
-  }, [userId])
+  }, [userId, today])
 
-  // Weekly bar chart data
+  // Weekly bar chart data anchored to `today` prop
   const weeklyData = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(Date.now() - (6 - i) * 86400000)
+    const d = new Date(new Date(today).getTime() - (6 - i) * 86400000)
     const dateStr = d.toISOString().split('T')[0]
     return {
       day: d.toLocaleDateString('en-US', { weekday: 'short' }),
@@ -61,17 +64,16 @@ export default function DistractionTracker({ userId }: Props) {
     }
   })
 
-  const today = new Date().toISOString().split('T')[0]
   const todayCount = events.filter(e => e.occurred_at.startsWith(today)).length
-  const weekTotal = events.length
-  const avgPerDay = weekTotal > 0 ? (weekTotal / 7).toFixed(1) : '0'
-  const worstDay = weeklyData.reduce((max, d) => d.count > max.count ? d : max, { day: '-', count: 0 })
+  const weekTotal  = events.length
+  const avgPerDay  = weekTotal > 0 ? (weekTotal / 7).toFixed(1) : '0'
+  const worstDay   = weeklyData.reduce((max, d) => d.count > max.count ? d : max, { day: '-', count: 0 })
 
   const getRiskLevel = (count: number) => {
-    if (count === 0) return { label: 'Clean', color: 'text-green-400', bg: 'bg-green-900/20 border-green-800/40' }
-    if (count <= 3) return { label: 'Low', color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-800/40' }
+    if (count === 0) return { label: 'Clean',  color: 'text-green-400',  bg: 'bg-green-900/20 border-green-800/40'   }
+    if (count <= 3) return { label: 'Low',    color: 'text-yellow-400', bg: 'bg-yellow-900/20 border-yellow-800/40' }
     if (count <= 7) return { label: 'Medium', color: 'text-orange-400', bg: 'bg-orange-900/20 border-orange-800/40' }
-    return { label: 'High', color: 'text-red-400', bg: 'bg-red-900/20 border-red-800/40' }
+    return              { label: 'High',   color: 'text-red-400',    bg: 'bg-red-900/20 border-red-800/40'       }
   }
 
   const risk = getRiskLevel(todayCount)

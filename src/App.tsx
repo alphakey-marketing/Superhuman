@@ -53,8 +53,6 @@ export default function App() {
   const [today, setToday]           = useState(getTodayStr)
   const [todayLabel, setTodayLabel] = useState(getTodayLabel)
 
-  // Snap today to the real current date. Called by both the midnight timer
-  // and the visibilitychange guard so lid-open / tab-return always corrects.
   const syncDate = useCallback(() => {
     const real = getTodayStr()
     setToday(prev => {
@@ -85,9 +83,6 @@ export default function App() {
   }, [syncDate])
 
   // ── visibilitychange guard (covers lid-open, phone-unlock, tab-return) ────
-  // If the browser was suspended overnight, the setTimeout above fires late or
-  // not at all. The moment the user returns to the tab we check the real date
-  // and update immediately if it has changed.
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') syncDate()
@@ -108,21 +103,36 @@ export default function App() {
     }
   }, [user])
 
+  // ── QuickStart badge check ──────────────────────────────────────────────
+  // Runs on: user change, today change (midnight), active tab change,
+  // AND visibilitychange so badges refresh even if the user stays on Dashboard.
+  const checkBadges = useCallback(async (uid: string, date: string) => {
+    const { supabase } = await import('./lib/supabase')
+    const [{ data: b }, { data: s }, { data: sk }] = await Promise.all([
+      supabase.from('attention_budgets').select('id').eq('user_id', uid).eq('date', date).limit(1),
+      supabase.from('pomodoro_sessions').select('id').eq('user_id', uid).gte('started_at', date).limit(1),
+      supabase.from('practice_skills').select('id').eq('user_id', uid).limit(1),
+    ])
+    setHasBudget((b?.length ?? 0) > 0)
+    setHasSessions((s?.length ?? 0) > 0)
+    setHasSkills((sk?.length ?? 0) > 0)
+  }, [])
+
   useEffect(() => {
     if (!user) return
-    const check = async () => {
-      const { supabase } = await import('./lib/supabase')
-      const [{ data: b }, { data: s }, { data: sk }] = await Promise.all([
-        supabase.from('attention_budgets').select('id').eq('user_id', user.id).eq('date', today).limit(1),
-        supabase.from('pomodoro_sessions').select('id').eq('user_id', user.id).gte('started_at', today).limit(1),
-        supabase.from('practice_skills').select('id').eq('user_id', user.id).limit(1),
-      ])
-      setHasBudget((b?.length ?? 0) > 0)
-      setHasSessions((s?.length ?? 0) > 0)
-      setHasSkills((sk?.length ?? 0) > 0)
+    checkBadges(user.id, today)
+  }, [user, today, activeTab, checkBadges])
+
+  // Re-check badges on visibility restore (covers overnight open case)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && user) {
+        checkBadges(user.id, getTodayStr())
+      }
     }
-    check()
-  }, [user, today, activeTab])
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [user, checkBadges])
 
   const handleOnboardingDone = () => {
     localStorage.setItem(ONBOARDING_KEY, '1')
@@ -280,7 +290,7 @@ export default function App() {
                 💡 <strong>How this works:</strong> Every time you switch tabs during a Pomodoro, it’s auto-logged. Review your patterns here to find your biggest distraction triggers.
               </p>
             </div>
-            <DistractionTracker userId={user.id} />
+            <DistractionTracker userId={user.id} today={today} />
           </>
         )}
 
