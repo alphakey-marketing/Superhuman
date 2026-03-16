@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Brain, LayoutDashboard, Target, Timer, LogOut, Menu, X, BarChart2, Leaf, Dumbbell, Flame } from 'lucide-react'
 import { useAuth } from './hooks/useAuth'
 import { useDistraction } from './hooks/useDistraction'
@@ -18,6 +18,11 @@ import UATBanner from './components/UATBanner'
 type Tab = 'dashboard' | 'budget' | 'pomodoro' | 'analytics' | 'practice' | 'vault'
 
 const ONBOARDING_KEY = 'attentionos_onboarded_v1'
+const MS_24H = 24 * 60 * 60 * 1000
+
+// Stamped once when the JS bundle first loads — survives re-renders but not a
+// hard reload (which is exactly what we want to detect).
+const APP_BOOT_TIME = Date.now()
 
 const tabs = [
   { id: 'dashboard' as Tab, label: 'Home',      shortLabel: 'Home',  icon: LayoutDashboard },
@@ -95,6 +100,29 @@ export default function App() {
     }
   }, [syncDate])
 
+  // ── Hard-reload fallback (last-resort safety net) ──────────────────────
+  // If the app has been open for >24 h AND no Pomodoro is running, reload the
+  // page the next time the user returns to the tab. This guarantees a completely
+  // fresh state even if any React date logic silently failed.
+  // pomodoroRunningRef lets the closure read the live value without re-registering
+  // the event listener on every render.
+  const pomodoroRunningRef = useRef(pomodoroRunning)
+  useEffect(() => { pomodoroRunningRef.current = pomodoroRunning }, [pomodoroRunning])
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (
+        document.visibilityState === 'visible' &&
+        !pomodoroRunningRef.current &&
+        Date.now() - APP_BOOT_TIME > MS_24H
+      ) {
+        window.location.reload()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
+
   useDistraction(user?.id, pomodoroRunning)
 
   useEffect(() => {
@@ -104,8 +132,6 @@ export default function App() {
   }, [user])
 
   // ── QuickStart badge check ──────────────────────────────────────────────
-  // Runs on: user change, today change (midnight), active tab change,
-  // AND visibilitychange so badges refresh even if the user stays on Dashboard.
   const checkBadges = useCallback(async (uid: string, date: string) => {
     const { supabase } = await import('./lib/supabase')
     const [{ data: b }, { data: s }, { data: sk }] = await Promise.all([
