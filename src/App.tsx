@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Brain, LayoutDashboard, Target, Timer, LogOut, Menu, X, BarChart2, Leaf, Dumbbell, Flame } from 'lucide-react'
 import { useAuth } from './hooks/useAuth'
 import { useDistraction } from './hooks/useDistraction'
@@ -49,10 +49,24 @@ export default function App() {
   const [hasSessions, setHasSessions] = useState(false)
   const [hasSkills, setHasSkills] = useState(false)
 
-  // ── today as state — midnight setTimeout flips it for every child that receives it ──
+  // ── Single source of truth for "today" ────────────────────────────────────
   const [today, setToday]           = useState(getTodayStr)
   const [todayLabel, setTodayLabel] = useState(getTodayLabel)
 
+  // Snap today to the real current date. Called by both the midnight timer
+  // and the visibilitychange guard so lid-open / tab-return always corrects.
+  const syncDate = useCallback(() => {
+    const real = getTodayStr()
+    setToday(prev => {
+      if (prev !== real) {
+        setTodayLabel(getTodayLabel())
+        return real
+      }
+      return prev
+    })
+  }, [])
+
+  // ── Midnight setTimeout (works when screen stays on) ──────────────────────
   useEffect(() => {
     const scheduleRefresh = () => {
       const now  = new Date()
@@ -61,15 +75,30 @@ export default function App() {
       next.setHours(0, 0, 0, 0)
       const msUntilMidnight = next.getTime() - now.getTime()
       const timeout = setTimeout(() => {
-        setToday(getTodayStr())
-        setTodayLabel(getTodayLabel())
+        syncDate()
         scheduleRefresh()
       }, msUntilMidnight)
       return timeout
     }
     const timeout = scheduleRefresh()
     return () => clearTimeout(timeout)
-  }, [])
+  }, [syncDate])
+
+  // ── visibilitychange guard (covers lid-open, phone-unlock, tab-return) ────
+  // If the browser was suspended overnight, the setTimeout above fires late or
+  // not at all. The moment the user returns to the tab we check the real date
+  // and update immediately if it has changed.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') syncDate()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [syncDate])
 
   useDistraction(user?.id, pomodoroRunning)
 
