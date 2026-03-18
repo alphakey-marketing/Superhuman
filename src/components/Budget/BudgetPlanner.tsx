@@ -261,8 +261,6 @@ export default function BudgetPlanner({ userId, date }: Props) {
   const [showFragments, setShowFragments] = useState(false)
   const [expandedFragment, setExpandedFragment] = useState<string | null>(null)
 
-  // Track previous date so we can detect a day rollover
-  const prevDateRef = useRef(date)
 
   const totalAllocated  = budgets.reduce((sum, b) => sum + b.hours_allocated, 0)
   const totalUsed       = budgets.reduce((sum, b) => sum + b.hours_used, 0)
@@ -271,13 +269,10 @@ export default function BudgetPlanner({ userId, date }: Props) {
   const isOverRealHours = totalAllocated > REAL_AVAILABLE_HOURS
 
   useEffect(() => {
-    // When the date changes (midnight rollover), wipe stale UI state immediately
-    if (prevDateRef.current !== date) {
-      prevDateRef.current = date
+        // Reset UI state before fetching - works on mount AND date change
       setBudgets([])
       setShowTemplates(true)   // re-open template picker for the new day
       setExpandedMeta(null)
-    }
 
     setLoading(true)
     const fetchBudgets = async () => {
