@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Pin, Flame, Crown, Diamond, Trophy, PenLine, Shuffle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Trash2, Pin, Flame, Crown, Diamond, Trophy, PenLine, Shuffle, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { MotivationEntry, VAULT_TYPES } from '../../types'
 
@@ -60,6 +60,7 @@ export default function MotivationVault({ userId }: Props) {
   const [content, setContent] = useState('')
   const [spotlightIndex, setSpotlightIndex] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
   const [showAllStarters, setShowAllStarters] = useState(false)
 
   useEffect(() => { load() }, [userId])
@@ -78,13 +79,16 @@ export default function MotivationVault({ userId }: Props) {
   const addEntry = async () => {
     if (!content.trim()) return
     setSaving(true)
-    const { data } = await supabase.from('motivation_vault').insert({
+    setAddError(null)
+    const { data, error } = await supabase.from('motivation_vault').insert({
       user_id: userId,
       type: activeType,
       content: content.trim(),
       is_pinned: false,
     }).select().single()
-    if (data) {
+    if (error) {
+      setAddError(`Could not save entry: ${error.message}`)
+    } else if (data) {
       setEntries(prev => [data, ...prev])
       setContent('')
       setShowAdd(false)
@@ -253,7 +257,15 @@ export default function MotivationVault({ userId }: Props) {
             {(Object.keys(VAULT_TYPES) as MotivationEntry['type'][]).map(t => (
               <button
                 key={t}
-                onClick={() => { setActiveType(t); setContent(VAULT_TYPES[t].placeholder) }}
+                onClick={() => {
+                  // Only auto-fill placeholder if content is empty or still showing
+                  // the current type's placeholder (i.e. user hasn't typed their own text)
+                  const currentPlaceholder = VAULT_TYPES[activeType].placeholder
+                  if (!content.trim() || content === currentPlaceholder) {
+                    setContent(VAULT_TYPES[t].placeholder)
+                  }
+                  setActiveType(t)
+                }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all ${
                   activeType === t ? 'text-white' : 'bg-gray-800 text-gray-500 hover:text-gray-300'
                 }`}
@@ -267,6 +279,13 @@ export default function MotivationVault({ userId }: Props) {
               </button>
             ))}
           </div>
+          {addError && (
+            <div className="flex items-start gap-2 bg-red-950/60 border border-red-800/60 rounded-xl px-3 py-2">
+              <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-red-300 text-xs">{addError}</p>
+              <button onClick={() => setAddError(null)} className="ml-auto text-red-500 hover:text-red-300 text-xs">✕</button>
+            </div>
+          )}
           <textarea
             value={content}
             onChange={e => setContent(e.target.value)}
@@ -284,7 +303,7 @@ export default function MotivationVault({ userId }: Props) {
               {saving ? 'Saving...' : 'Add to Vault'}
             </button>
             <button
-              onClick={() => { setShowAdd(false); setContent('') }}
+              onClick={() => { setShowAdd(false); setContent(''); setAddError(null) }}
               className="px-4 py-2.5 text-gray-500 border border-gray-700 text-sm rounded-xl hover:border-gray-500 transition-colors"
             >
               Cancel
@@ -293,7 +312,12 @@ export default function MotivationVault({ userId }: Props) {
         </div>
       ) : (
         <button
-          onClick={() => setShowAdd(true)}
+          onClick={() => {
+            setShowAdd(true)
+            setAddError(null)
+            // Seed the placeholder on fresh open if content is empty
+            if (!content.trim()) setContent(VAULT_TYPES[activeType].placeholder)
+          }}
           className="w-full py-3 border border-dashed border-gray-700 hover:border-orange-500 text-gray-500 hover:text-orange-400 rounded-2xl text-sm flex items-center justify-center gap-2 transition-all"
         >
           <Plus className="w-4 h-4" /> Add to vault

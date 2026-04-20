@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronUp, Zap, Star, AlertCircle, BookOpen } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, ChevronUp, Zap, Star, AlertCircle, BookOpen, CheckCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { PracticeSkill, PracticeSubSkill, PracticeSession, SKILL_COLORS } from '../../types'
 
@@ -36,6 +36,19 @@ function DifficultyStars({ value, onChange }: { value: number; onChange?: (v: nu
   )
 }
 
+function QualityStars({ value, onChange }: { value: number; onChange?: (v: number) => void }) {
+  return (
+    <div className="flex gap-0.5">
+      {[1,2,3,4,5].map(i => (
+        <button key={i} type="button" onClick={() => onChange?.(i)}
+          className={`transition-colors ${i <= value ? 'text-emerald-400' : 'text-gray-600'} ${onChange ? 'hover:text-emerald-300 cursor-pointer' : 'cursor-default'}`}>
+          <CheckCircle className="w-4 h-4" />
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function PracticeTracker({ userId }: Props) {
   const [skills,    setSkills]    = useState<PracticeSkill[]>([])
   const [subSkills, setSubSkills] = useState<PracticeSubSkill[]>([])
@@ -45,6 +58,8 @@ export default function PracticeTracker({ userId }: Props) {
   const [showAddSkill,   setShowAddSkill]   = useState(false)
   const [showLogSession, setShowLogSession] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showAllSessionsFor, setShowAllSessionsFor] = useState<string | null>(null)
+  const [confirmDeleteSkill, setConfirmDeleteSkill] = useState<string | null>(null)
 
   // Add skill form
   const [newSkillName,     setNewSkillName]     = useState('')
@@ -79,7 +94,7 @@ export default function PracticeTracker({ userId }: Props) {
     setSubSkills(sub ?? [])
     setSessions(se ?? [])
 
-    if (loadedSkills.length === 0) {
+    if (loadedSkills.length === 0 && (sub ?? []).length === 0) {
       const seeded = await seedTemplateSkills()
       setSkills(seeded)
     } else {
@@ -128,6 +143,11 @@ export default function PracticeTracker({ userId }: Props) {
   }
 
   const deleteSkill = async (id: string) => {
+    if (confirmDeleteSkill !== id) {
+      setConfirmDeleteSkill(id)
+      return
+    }
+    setConfirmDeleteSkill(null)
     const { error: err } = await supabase.from('practice_skills').delete().eq('id', id)
     if (err) { setError(`Could not delete skill: ${err.message}`); return }
     setSkills(prev    => prev.filter(s => s.id !== id))
@@ -176,18 +196,10 @@ export default function PracticeTracker({ userId }: Props) {
     if (!sessionData) { setError('Could not log session: insert returned no data. Check RLS for practice_sessions.'); return }
     setSessions(prev => [sessionData, ...prev])
 
-    const { data: sk } = await supabase.from('practice_skills').select('*').eq('id', skillId).single()
-    if (sk) {
-      const allSessions = [sessionData, ...sessions.filter(s => s.skill_id === skillId)]
-      const clientTotal = allSessions.reduce((sum, s) => sum + s.duration_minutes, 0) / 60
-      const dbTotal   = Number(sk.total_hours)
-      const prevTotal = Number(skills.find(s => s.id === skillId)?.total_hours ?? 0)
-      setSkills(prev => prev.map(s => s.id === skillId ? { ...sk, total_hours: dbTotal > prevTotal ? dbTotal : clientTotal } : s))
-    } else {
-      const allSessions = [sessionData, ...sessions.filter(s => s.skill_id === skillId)]
-      const clientTotal = allSessions.reduce((sum, s) => sum + s.duration_minutes, 0) / 60
-      setSkills(prev => prev.map(s => s.id === skillId ? { ...s, total_hours: clientTotal } : s))
-    }
+    // Trust client-side calculation — no DB refetch needed, avoids trigger race conditions
+    const allSessions = [sessionData, ...sessions.filter(s => s.skill_id === skillId)]
+    const clientTotal = allSessions.reduce((sum, s) => sum + s.duration_minutes, 0) / 60
+    setSkills(prev => prev.map(s => s.id === skillId ? { ...s, total_hours: clientTotal } : s))
     setShowLogSession(null)
     setSessionSubSkillId(null)
     setSessionNotes('')
@@ -401,8 +413,8 @@ export default function PracticeTracker({ userId }: Props) {
                   </div>
 
                   <div>
-                    <label className="text-gray-500 text-xs mb-1 block">Quality (how well did it go?)</label>
-                    <DifficultyStars value={sessionQuality} onChange={setSessionQuality} />
+                    <label className="text-gray-500 text-xs mb-1 block">Quality <span className="text-gray-600">(how well did it go?)</span></label>
+                    <QualityStars value={sessionQuality} onChange={setSessionQuality} />
                   </div>
 
                   <textarea placeholder="Notes: what did you work on? What clicked? (optional)"
@@ -425,7 +437,7 @@ export default function PracticeTracker({ userId }: Props) {
                     <p className="text-gray-600 text-sm text-center py-4">No sessions logged yet</p>
                   ) : (
                     <div className="divide-y divide-gray-800">
-                      {skillSessions.slice(0, 10).map(session => {
+                      {(showAllSessionsFor === skill.id ? skillSessions : skillSessions.slice(0, 10)).map(session => {
                         const sessionSubSkill = session.sub_skill_id
                           ? subSkills.find(s => s.id === session.sub_skill_id)
                           : null
@@ -441,13 +453,13 @@ export default function PracticeTracker({ userId }: Props) {
                               )}
                             </div>
                             <div className="flex items-center gap-3 mt-1">
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1" title="Difficulty">
                                 <Zap className="w-3 h-3 text-yellow-500" />
                                 <DifficultyStars value={session.difficulty} />
                               </div>
-                              <div className="flex items-center gap-1">
-                                <Star className="w-3 h-3 text-green-500" />
-                                <DifficultyStars value={session.quality} />
+                              <div className="flex items-center gap-1" title="Quality">
+                                <CheckCircle className="w-3 h-3 text-emerald-500" />
+                                <QualityStars value={session.quality} />
                               </div>
                             </div>
                             {session.notes && <p className="text-gray-500 text-xs mt-1 italic">"{session.notes}"</p>}
@@ -456,11 +468,43 @@ export default function PracticeTracker({ userId }: Props) {
                       })}
                     </div>
                   )}
+                  {skillSessions.length > 10 && (
+                    <div className="px-4 pb-1 pt-2">
+                      <button
+                        onClick={() => setShowAllSessionsFor(showAllSessionsFor === skill.id ? null : skill.id)}
+                        className="w-full text-xs text-gray-500 hover:text-indigo-400 transition-colors py-1.5 flex items-center justify-center gap-1"
+                      >
+                        {showAllSessionsFor === skill.id ? (
+                          <><ChevronUp className="w-3.5 h-3.5" /> Show less</>
+                        ) : (
+                          <><ChevronDown className="w-3.5 h-3.5" /> Show {skillSessions.length - 10} more sessions ({skillSessions.length} total)</>
+                        )}
+                      </button>
+                    </div>
+                  )}
                   <div className="px-4 pb-3 flex justify-end">
-                    <button onClick={() => deleteSkill(skill.id)}
-                      className="flex items-center gap-1.5 text-red-500/60 hover:text-red-400 text-xs transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" /> Delete skill
-                    </button>
+                    {confirmDeleteSkill === skill.id ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-red-400 text-xs">Delete all data for this skill?</span>
+                        <button
+                          onClick={() => deleteSkill(skill.id)}
+                          className="text-red-400 hover:text-red-300 text-xs font-semibold transition-colors"
+                        >
+                          Yes, delete
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteSkill(null)}
+                          className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => deleteSkill(skill.id)}
+                        className="flex items-center gap-1.5 text-red-500/60 hover:text-red-400 text-xs transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" /> Delete skill
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
