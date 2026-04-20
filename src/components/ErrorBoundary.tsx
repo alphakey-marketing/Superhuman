@@ -50,8 +50,9 @@ export default class ErrorBoundary extends Component<Props, State> {
               <button
                 onClick={this.handleReload}
                 className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-xl font-medium transition-colors"
+                title="Re-render without a full page reload"
               >
-                Try again
+                Retry
               </button>
               <button
                 onClick={() => window.location.reload()}

@@ -260,8 +260,9 @@ export default function MotivationVault({ userId }: Props) {
                 onClick={() => {
                   // Only auto-fill placeholder if content is empty or still showing
                   // the current type's placeholder (i.e. user hasn't typed their own text)
+                  const trimmed = content.trim()
                   const currentPlaceholder = VAULT_TYPES[activeType].placeholder
-                  if (!content.trim() || content.trim() === currentPlaceholder.trim()) {
+                  if (!trimmed || trimmed === currentPlaceholder.trim()) {
                     setContent(VAULT_TYPES[t].placeholder)
                   }
                   setActiveType(t)
