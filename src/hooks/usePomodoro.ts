@@ -274,13 +274,20 @@ export function usePomodoro(userId: string | undefined, date: string) {
       if (!s.sessionId || !s.isRunning) return
 
       // Read the auth token from Supabase's localStorage entry (v2 format)
-      let accessToken = SUPABASE_ANON_KEY
+      let accessToken: string | null = null
       try {
         const projectRef = SUPABASE_URL.match(/https:\/\/([^.]+)\./)?.[1] ?? ''
         const raw = localStorage.getItem(`sb-${projectRef}-auth-token`)
         const parsed = raw ? JSON.parse(raw) : null
         if (parsed?.access_token) accessToken = parsed.access_token
-      } catch (_) {}
+      } catch (err) {
+        console.warn('[usePomodoro] Could not read auth token from localStorage:', err)
+      }
+
+      // Skip the update if we can't get an authenticated token — the session
+      // will remain as an orphan with status 'active', which is preferable to
+      // sending an unauthenticated request with the anon key.
+      if (!accessToken) return
 
       const url = `${SUPABASE_URL}/rest/v1/pomodoro_sessions?id=eq.${s.sessionId}`
       const body = JSON.stringify({ ended_at: new Date().toISOString(), status: 'abandoned' })
@@ -297,7 +304,9 @@ export function usePomodoro(userId: string | undefined, date: string) {
           body,
           keepalive: true,
         })
-      } catch (_) {}
+      } catch (err) {
+        console.warn('[usePomodoro] beforeunload: failed to mark session abandoned:', err)
+      }
     }
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)

@@ -163,8 +163,8 @@ export default function App() {
     try {
       const { supabase } = await import('./lib/supabase')
       await supabase.auth.updateUser({ data: { attentionos_onboarded: true } })
-    } catch (_) {
-      // Fall back to localStorage if metadata update fails
+    } catch (err) {
+      console.warn('[App] Could not store onboarding flag in user metadata, falling back to localStorage:', err)
       localStorage.setItem('attentionos_onboarded_v1', '1')
     }
     setShowOnboarding(false)
