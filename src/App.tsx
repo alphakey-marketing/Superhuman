@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Brain, LayoutDashboard, Target, Timer, LogOut, Menu, X, BarChart2, Dumbbell, Flame } from 'lucide-react'
 import { useAuth } from './hooks/useAuth'
 import { useDistraction } from './hooks/useDistraction'
+import { supabase } from './lib/supabase'
 import LoginForm from './components/Auth/LoginForm'
 import BudgetPlanner from './components/Budget/BudgetPlanner'
 import PomodoroTimer from './components/Pomodoro/PomodoroTimer'
@@ -132,7 +133,6 @@ export default function App() {
 
   // ── QuickStart badge check ──────────────────────────────────────────────
   const checkBadges = useCallback(async (uid: string, date: string) => {
-    const { supabase } = await import('./lib/supabase')
     const [{ data: b }, { data: s }, { data: sk }] = await Promise.all([
       supabase.from('attention_budgets').select('id').eq('user_id', uid).eq('date', date).limit(1),
       supabase.from('pomodoro_sessions').select('id').eq('user_id', uid).gte('started_at', date).limit(1),
@@ -161,7 +161,6 @@ export default function App() {
 
   const handleOnboardingDone = async () => {
     try {
-      const { supabase } = await import('./lib/supabase')
       await supabase.auth.updateUser({ data: { attentionos_onboarded: true } })
     } catch (err) {
       console.warn('[App] Could not store onboarding flag in user metadata, falling back to localStorage:', err)

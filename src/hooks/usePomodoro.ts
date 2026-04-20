@@ -276,10 +276,14 @@ export function usePomodoro(userId: string | undefined, date: string) {
       // Read the auth token from Supabase's localStorage entry (v2 format)
       let accessToken: string | null = null
       try {
-        const projectRef = SUPABASE_URL.match(/https:\/\/([^.]+)\./)?.[1] ?? ''
-        const raw = localStorage.getItem(`sb-${projectRef}-auth-token`)
-        const parsed = raw ? JSON.parse(raw) : null
-        if (parsed?.access_token) accessToken = parsed.access_token
+        const projectRef = SUPABASE_URL
+          ? SUPABASE_URL.match(/https:\/\/([^.]+)\./)?.[1] ?? ''
+          : ''
+        if (projectRef) {
+          const raw = localStorage.getItem(`sb-${projectRef}-auth-token`)
+          const parsed = raw ? JSON.parse(raw) : null
+          if (parsed?.access_token) accessToken = parsed.access_token
+        }
       } catch (err) {
         console.warn('[usePomodoro] Could not read auth token from localStorage:', err)
       }
