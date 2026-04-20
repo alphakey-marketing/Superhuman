@@ -146,7 +146,7 @@ export default function App() {
   useEffect(() => {
     if (!user) return
     checkBadges(user.id, today)
-  }, [user, today, activeTab, checkBadges])
+  }, [user, today, checkBadges])
 
   // Re-check badges on visibility restore (covers overnight open case)
   useEffect(() => {

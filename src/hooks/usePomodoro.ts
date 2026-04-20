@@ -127,6 +127,22 @@ export function usePomodoro(userId: string | undefined, date: string) {
   stateRef.current           = state
   const startEpochRef        = useRef<number | null>(null)
   const elapsedAtPauseRef    = useRef<number>(0)
+  // Keep userId always fresh — avoids stale closure after token refresh
+  const userIdRef            = useRef(userId)
+  useEffect(() => { userIdRef.current = userId }, [userId])
+  // Keep current access token fresh for the beforeunload handler
+  const accessTokenRef       = useRef<string | null>(null)
+  useEffect(() => {
+    // Seed immediately from current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      accessTokenRef.current = session?.access_token ?? null
+    })
+    // Keep up-to-date on token refresh / sign-in / sign-out
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      accessTokenRef.current = session?.access_token ?? null
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   // ── Hydrate cycles + distractions from DB on mount / date change ────────────
   useEffect(() => {
@@ -160,7 +176,7 @@ export function usePomodoro(userId: string | undefined, date: string) {
         : 'Break over - ready for the next focus block?'
     )
 
-    if (s.sessionId && userId) {
+    if (s.sessionId && userIdRef.current) {
       const newCycles = s.mode === 'focus' ? s.cycles + 1 : s.cycles
       await supabase
         .from('pomodoro_sessions')
@@ -196,7 +212,7 @@ export function usePomodoro(userId: string | undefined, date: string) {
     } else {
       dispatch({ type: 'NEXT_MODE', mode: 'focus' })
     }
-  }, [userId])
+  }, [])
 
   const computeAndSync = useCallback(() => {
     if (!stateRef.current.isRunning || startEpochRef.current === null) return
@@ -240,11 +256,11 @@ export function usePomodoro(userId: string | undefined, date: string) {
 
   const start = useCallback(async () => {
     dispatch({ type: 'START' })
-    if (!stateRef.current.sessionId && userId) {
+    if (!stateRef.current.sessionId && userIdRef.current) {
       const { data } = await supabase
         .from('pomodoro_sessions')
         .insert({
-          user_id: userId,
+          user_id: userIdRef.current,
           task_label: stateRef.current.taskLabel || null,
           budget_category: stateRef.current.budgetCategory || null,
         })
@@ -252,7 +268,7 @@ export function usePomodoro(userId: string | undefined, date: string) {
         .single()
       if (data) dispatch({ type: 'SET_SESSION_ID', id: data.id })
     }
-  }, [userId])
+  }, [])
 
   const abandon = useCallback(async () => {
     dispatch({ type: 'PAUSE' })
@@ -273,24 +289,10 @@ export function usePomodoro(userId: string | undefined, date: string) {
       const s = stateRef.current
       if (!s.sessionId || !s.isRunning) return
 
-      // Read the auth token from Supabase's localStorage entry (v2 format)
-      let accessToken: string | null = null
-      try {
-        const projectRef = SUPABASE_URL
-          ? SUPABASE_URL.match(/https:\/\/([^.]+)\./)?.[1] ?? ''
-          : ''
-        if (projectRef) {
-          const raw = localStorage.getItem(`sb-${projectRef}-auth-token`)
-          const parsed = raw ? JSON.parse(raw) : null
-          if (parsed?.access_token) accessToken = parsed.access_token
-        }
-      } catch (err) {
-        console.warn('[usePomodoro] Could not read auth token from localStorage:', err)
-      }
-
-      // Skip the update if we can't get an authenticated token — the session
-      // will remain as an orphan with status 'active', which is preferable to
-      // sending an unauthenticated request with the anon key.
+      // Use the token maintained via onAuthStateChange — avoids dependence on
+      // undocumented Supabase localStorage key formats that may change across
+      // SDK version upgrades.
+      const accessToken = accessTokenRef.current
       if (!accessToken) return
 
       const url = `${SUPABASE_URL}/rest/v1/pomodoro_sessions?id=eq.${s.sessionId}`

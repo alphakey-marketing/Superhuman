@@ -7,7 +7,7 @@ interface Props {
 }
 
 export default function StreakWidget({ userId, today }: Props) {
-  const { current, longest, lastActiveDate } = useStreaks(userId, today)
+  const { current, longest, lastActiveDate, loading } = useStreaks(userId, today)
 
   const getFlameColor = () => {
     if (current >= 7) return 'text-orange-400'
@@ -23,6 +23,28 @@ export default function StreakWidget({ userId, today }: Props) {
     if (current < 7) return `${current} days — great consistency!`
     if (current < 14) return `${current} days — you're on fire! 🔥`
     return `${current} days — legendary focus! 🏆`
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-gray-900 rounded-2xl p-4 border border-gray-800">
+        <div className="flex items-center gap-2 mb-4">
+          <Flame className="w-4 h-4 text-orange-400" />
+          <h4 className="text-gray-300 text-sm font-medium">Focus Streak</h4>
+        </div>
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-gray-800 rounded-xl p-3.5 text-center">
+            <div className="w-8 h-8 mx-auto mb-2 bg-gray-700 rounded-lg animate-pulse" />
+            <div className="h-4 w-12 mx-auto bg-gray-700 rounded animate-pulse" />
+          </div>
+          <div className="bg-gray-800 rounded-xl p-3.5 text-center">
+            <div className="w-8 h-8 mx-auto mb-2 bg-gray-700 rounded-lg animate-pulse" />
+            <div className="h-4 w-16 mx-auto bg-gray-700 rounded animate-pulse" />
+          </div>
+        </div>
+        <div className="h-3 w-48 mx-auto bg-gray-800 rounded animate-pulse" />
+      </div>
+    )
   }
 
   return (

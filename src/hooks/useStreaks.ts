@@ -5,6 +5,7 @@ export interface StreakData {
   current: number
   longest: number
   lastActiveDate: string | null
+  loading: boolean
 }
 
 /**
@@ -13,10 +14,11 @@ export interface StreakData {
  * Accepts `today` so the hook re-runs on midnight day rollover.
  */
 export function useStreaks(userId: string | undefined, today: string) {
-  const [streak, setStreak] = useState<StreakData>({ current: 0, longest: 0, lastActiveDate: null })
+  const [streak, setStreak] = useState<StreakData>({ current: 0, longest: 0, lastActiveDate: null, loading: true })
 
   useEffect(() => {
     if (!userId) return
+    setStreak(prev => ({ ...prev, loading: true }))
     const calculate = async () => {
       const { data } = await supabase
         .from('pomodoro_sessions')
@@ -26,7 +28,7 @@ export function useStreaks(userId: string | undefined, today: string) {
         .order('started_at', { ascending: false })
 
       if (!data || data.length === 0) {
-        setStreak({ current: 0, longest: 0, lastActiveDate: null })
+        setStreak({ current: 0, longest: 0, lastActiveDate: null, loading: false })
         return
       }
 
@@ -60,17 +62,24 @@ export function useStreaks(userId: string | undefined, today: string) {
         }
       }
 
-      // Longest streak
+      // Longest streak — temp tracks the current run length, longest captures the best
       for (let i = 1; i < activeDates.length; i++) {
         const prev = new Date(activeDates[i - 1])
         const curr = new Date(activeDates[i])
         const diff = (prev.getTime() - curr.getTime()) / 86400000
-        if (Math.round(diff) === 1) { temp++; longest = Math.max(longest, temp) }
-        else temp = 1
+        if (Math.round(diff) === 1) {
+          temp++
+          longest = Math.max(longest, temp)
+        } else {
+          // End of a consecutive run — capture temp before resetting
+          longest = Math.max(longest, temp)
+          temp = 1
+        }
       }
-      longest = Math.max(longest, current, 1)
+      // Use temp (last/only run), current active streak, but not a hardcoded 1
+      longest = Math.max(longest, current, temp)
 
-      setStreak({ current, longest, lastActiveDate: activeDates[0] })
+      setStreak({ current, longest, lastActiveDate: activeDates[0], loading: false })
     }
     calculate()
   }, [userId, today])
