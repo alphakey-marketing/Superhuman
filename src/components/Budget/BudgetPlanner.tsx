@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
-import { Plus, Trash2, GripVertical, Clock, ChevronDown, ChevronUp, Info, Zap } from 'lucide-react'
+import { Plus, Trash2, GripVertical, ChevronDown, ChevronUp, Info, Zap } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { AttentionBudget, CATEGORY_COLORS } from '../../types'
 
@@ -239,14 +239,6 @@ const DAY_TEMPLATES = [
   },
 ]
 
-const AVAILABLE_BLOCKS = [
-  { label: 'Morning focus (9–12:30)', hours: 3.5 },
-  { label: 'Lunch break (12:30–2)',   hours: 1.5 },
-  { label: 'Afternoon (2–6)',         hours: 4 },
-  { label: 'Evening at home (7–10)',  hours: 3 },
-]
-const REAL_AVAILABLE_HOURS = AVAILABLE_BLOCKS.reduce((s, b) => s + b.hours, 0)
-const TOTAL_HOURS = 16
 const CATEGORIES = Object.keys(CATEGORY_COLORS)
 
 export default function BudgetPlanner({ userId, date }: Props) {
@@ -263,10 +255,7 @@ export default function BudgetPlanner({ userId, date }: Props) {
 
 
   const totalAllocated  = budgets.reduce((sum, b) => sum + b.hours_allocated, 0)
-  const totalUsed       = budgets.reduce((sum, b) => sum + b.hours_used, 0)
-  const freeHours       = Math.max(TOTAL_HOURS - totalAllocated, 0)
-  const isOverBudget    = totalAllocated + newHours > TOTAL_HOURS
-  const isOverRealHours = totalAllocated > REAL_AVAILABLE_HOURS
+  const isOverBudget    = totalAllocated + newHours > 16
 
   useEffect(() => {
         // Reset UI state before fetching - works on mount AND date change
@@ -488,67 +477,6 @@ export default function BudgetPlanner({ userId, date }: Props) {
         )}
       </div>
 
-      {/* Available hours */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
-        <p className="text-gray-400 text-xs font-medium mb-2">⏰ Your real available hours today</p>
-        <div className="space-y-1.5">
-          {AVAILABLE_BLOCKS.map(b => (
-            <div key={b.label} className="flex items-center justify-between">
-              <span className="text-gray-500 text-xs">{b.label}</span>
-              <span className="text-gray-400 text-xs font-medium">{b.hours}h</span>
-            </div>
-          ))}
-          <div className="border-t border-gray-800 pt-1.5 flex items-center justify-between">
-            <span className="text-gray-300 text-xs font-semibold">Total usable time</span>
-            <span className="text-indigo-400 text-xs font-bold">{REAL_AVAILABLE_HOURS}h</span>
-          </div>
-        </div>
-        {isOverRealHours && (
-          <div className="mt-2 text-xs text-amber-400 bg-amber-900/20 border border-amber-800/30 rounded-lg px-3 py-2">
-            ⚠️ You've allocated {totalAllocated}h but only have ~{REAL_AVAILABLE_HOURS}h realistically available. Consider reducing.
-          </div>
-        )}
-      </div>
-
-      {/* Allocation bar */}
-      {budgets.length > 0 && (
-        <div>
-          <div className="flex justify-between text-xs text-gray-400 mb-2">
-            <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> {totalAllocated.toFixed(1)}h planned</span>
-            <span className={totalAllocated > REAL_AVAILABLE_HOURS ? 'text-amber-400' : 'text-gray-500'}>
-              {REAL_AVAILABLE_HOURS}h available
-            </span>
-          </div>
-          <div className="h-5 bg-gray-800 rounded-full overflow-hidden flex">
-            {budgets.map(b => (
-              <div key={b.id}
-                style={{ width: `${(b.hours_allocated / TOTAL_HOURS) * 100}%`, backgroundColor: b.color }}
-                title={`${b.category}: ${b.hours_allocated}h`}
-                className="transition-all duration-300 first:rounded-l-full" />
-            ))}
-            {freeHours > 0 && (
-              <div style={{ width: `${(freeHours / TOTAL_HOURS) * 100}%` }}
-                className="bg-gray-700/50 last:rounded-r-full"
-                title={`Unallocated: ${freeHours.toFixed(1)}h`} />
-            )}
-          </div>
-          <div className="flex flex-wrap gap-3 mt-2">
-            {budgets.map(b => (
-              <div key={b.id} className="flex items-center gap-1.5 text-xs text-gray-400">
-                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }} />
-                {CATEGORY_META[b.category]?.emoji} {b.category} ({b.hours_allocated}h)
-              </div>
-            ))}
-            {freeHours > 0 && (
-              <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                <div className="w-2 h-2 rounded-full bg-gray-700" />
-                Free ({freeHours.toFixed(1)}h)
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Draggable budget list */}
       <DragDropContext onDragEnd={onDragEnd}>
         <Droppable droppableId="budgets">
@@ -642,25 +570,9 @@ export default function BudgetPlanner({ userId, date }: Props) {
           </button>
         </div>
         {isOverBudget && (
-          <p className="text-xs text-red-400 text-center mt-2">Adding {newHours}h would exceed the {TOTAL_HOURS}h daily maximum</p>
+          <p className="text-xs text-red-400 text-center mt-2">Adding {newHours}h would exceed the 16h daily maximum</p>
         )}
       </div>
-
-      {/* Summary cards */}
-      {budgets.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { label: 'Planned',    value: `${totalAllocated.toFixed(1)}h`, color: 'text-indigo-400' },
-            { label: 'Used Today', value: `${totalUsed.toFixed(1)}h`,      color: 'text-green-400' },
-            { label: 'Free',       value: `${freeHours.toFixed(1)}h`,      color: 'text-yellow-400' },
-          ].map(stat => (
-            <div key={stat.label} className="bg-gray-800 rounded-xl p-3.5 text-center">
-              <p className={`text-xl font-bold ${stat.color}`}>{stat.value}</p>
-              <p className="text-gray-500 text-xs mt-0.5">{stat.label}</p>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }

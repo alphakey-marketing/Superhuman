@@ -30,9 +30,13 @@ export function useStreaks(userId: string | undefined, today: string) {
         return
       }
 
-      // Get unique active dates (desc)
+      // Get unique active dates in local timezone (desc)
+      // started_at is stored as UTC; convert to local date string to avoid off-by-one errors
       const activeDates = [...new Set(
-        data.map(s => s.started_at.split('T')[0])
+        data.map(s => {
+          const d = new Date(s.started_at)
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        })
       )].sort((a, b) => b.localeCompare(a))
 
       // yesterday relative to the `today` param (not new Date() at render time)

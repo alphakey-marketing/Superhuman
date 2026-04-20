@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 import { PomodoroMode, POMODORO_DURATIONS } from '../types'
-import { supabase } from '../lib/supabase'
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/supabase'
 
 interface PomodoroState {
   mode: PomodoroMode
@@ -21,7 +21,7 @@ type PomodoroAction =
   | { type: 'PAUSE' }
   | { type: 'RESET' }
   | { type: 'SET_TIME_LEFT'; timeLeft: number }
-  | { type: 'NEXT_MODE'; mode: PomodoroMode }
+  | { type: 'NEXT_MODE'; mode: PomodoroMode; incrementCycles?: boolean }
   | { type: 'ADD_DISTRACTION' }
   | { type: 'SET_TASK'; label: string; budgetCategory: string | null; budgetRowId: string | null }
   | { type: 'SET_SESSION_ID'; id: string }
@@ -49,7 +49,7 @@ function reducer(state: PomodoroState, action: PomodoroAction): PomodoroState {
         mode: action.mode,
         timeLeft: POMODORO_DURATIONS[action.mode],
         isRunning: false,
-        cycles: action.mode !== 'focus' ? state.cycles + 1 : state.cycles,
+        cycles: action.incrementCycles ? state.cycles + 1 : state.cycles,
         sessionId: null,
         sessionDistractions: 0,
       }
@@ -192,7 +192,7 @@ export function usePomodoro(userId: string | undefined, date: string) {
     if (s.mode === 'focus') {
       const nextCycles = s.cycles + 1
       const nextMode: PomodoroMode = nextCycles % 4 === 0 ? 'long_break' : 'short_break'
-      dispatch({ type: 'NEXT_MODE', mode: nextMode })
+      dispatch({ type: 'NEXT_MODE', mode: nextMode, incrementCycles: true })
     } else {
       dispatch({ type: 'NEXT_MODE', mode: 'focus' })
     }
@@ -265,6 +265,42 @@ export function usePomodoro(userId: string | undefined, date: string) {
         .eq('id', stateRef.current.sessionId)
     }
     dispatch({ type: 'RESET' })
+  }, [])
+
+  // Mark the active session as abandoned when the user closes/reloads the tab
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      const s = stateRef.current
+      if (!s.sessionId || !s.isRunning) return
+
+      // Read the auth token from Supabase's localStorage entry (v2 format)
+      let accessToken = SUPABASE_ANON_KEY
+      try {
+        const projectRef = SUPABASE_URL.match(/https:\/\/([^.]+)\./)?.[1] ?? ''
+        const raw = localStorage.getItem(`sb-${projectRef}-auth-token`)
+        const parsed = raw ? JSON.parse(raw) : null
+        if (parsed?.access_token) accessToken = parsed.access_token
+      } catch (_) {}
+
+      const url = `${SUPABASE_URL}/rest/v1/pomodoro_sessions?id=eq.${s.sessionId}`
+      const body = JSON.stringify({ ended_at: new Date().toISOString(), status: 'abandoned' })
+      // Use fetch with keepalive so the browser sends the request even as the page unloads
+      try {
+        fetch(url, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${accessToken}`,
+            Prefer: 'return=minimal',
+          },
+          body,
+          keepalive: true,
+        })
+      } catch (_) {}
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [])
 
   const setTask = useCallback((

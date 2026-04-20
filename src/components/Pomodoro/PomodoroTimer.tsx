@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Play, Pause, RotateCcw, AlertTriangle, ChevronRight, Leaf } from 'lucide-react'
+import { Play, Pause, RotateCcw, AlertTriangle, ChevronRight, Leaf, Flame } from 'lucide-react'
 import { usePomodoro } from '../../hooks/usePomodoro'
-import { PomodoroMode, AttentionBudget, CATEGORY_COLORS } from '../../types'
+import { PomodoroMode, AttentionBudget, CATEGORY_COLORS, MotivationEntry, VAULT_TYPES } from '../../types'
 import { supabase } from '../../lib/supabase'
 
 interface Props {
@@ -9,6 +9,7 @@ interface Props {
   date: string
   onRunningChange?: (running: boolean) => void
   onTimeLeftChange?: (timeLeft: number | null) => void
+  onBreakRequest?: () => void
 }
 
 const MODE_LABELS: Record<PomodoroMode, string> = {
@@ -54,7 +55,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
   'Meals':         '🍽️',
 }
 
-export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLeftChange }: Props) {
+export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLeftChange, onBreakRequest }: Props) {
   // Pass date into the hook so hydration re-runs on midnight rollover
   const { state, start, pause, reset, abandon, addDistraction, setTask, switchMode } = usePomodoro(userId, date)
 
@@ -62,6 +63,7 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
   const [budgetsLoaded, setBudgetsLoaded] = useState(false)
   const [selectedBudgetId, setSelectedBudgetId] = useState<string>('')
   const [taskNote, setTaskNote]           = useState('')
+  const [vaultEntry, setVaultEntry]       = useState<MotivationEntry | null>(null)
 
   const { mode, timeLeft, isRunning, cycles, distractions, sessionDistractions } = state
 
@@ -104,6 +106,23 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
       window.removeEventListener('focus', onVisible)
     }
   }, [loadBudgets, isRunning])
+
+  // Fetch a random vault entry for the pre-start motivational pull-quote
+  useEffect(() => {
+    const loadVaultEntry = async () => {
+      const { data } = await supabase
+        .from('motivation_vault')
+        .select('*')
+        .eq('user_id', userId)
+        .order('is_pinned', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(20)
+      if (data && data.length > 0) {
+        setVaultEntry(data[Math.floor(Math.random() * data.length)])
+      }
+    }
+    loadVaultEntry()
+  }, [userId])
 
   // Push selection into hook
   useEffect(() => {
@@ -315,12 +334,29 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
         </div>
       )}
 
+      {/* Motivational pull-quote — shown before the user starts a focus session */}
+      {mode === 'focus' && !isRunning && !state.sessionId && vaultEntry && (
+        <div className="w-full bg-gradient-to-r from-orange-950/40 to-red-950/30 border border-orange-800/30 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Flame className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+            <span className="text-orange-400 text-xs font-medium">
+              {VAULT_TYPES[vaultEntry.type].emoji} {VAULT_TYPES[vaultEntry.type].label}
+            </span>
+          </div>
+          <p className="text-gray-200 text-xs leading-relaxed italic">"{vaultEntry.content}"</p>
+        </div>
+      )}
+
       {/* Break suggestion */}
       {!isRunning && cycles > 0 && mode !== 'focus' && (
-        <div className="flex items-center gap-2 bg-emerald-900/20 border border-emerald-800/30 rounded-xl px-4 py-3 w-full">
+        <button
+          onClick={onBreakRequest}
+          className="flex items-center gap-2 bg-emerald-900/20 hover:bg-emerald-900/30 border border-emerald-800/30 rounded-xl px-4 py-3 w-full text-left transition-colors"
+        >
           <Leaf className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-          <p className="text-emerald-300/80 text-xs">Great session! Hit the 🌿 Break button in the header for a science-backed restoration break.</p>
-        </div>
+          <p className="text-emerald-300/80 text-xs flex-1">Great session! Tap here for a science-backed restoration break.</p>
+          <ChevronRight className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+        </button>
       )}
 
       {!isRunning && cycles === 0 && (
