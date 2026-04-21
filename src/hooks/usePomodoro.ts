@@ -177,7 +177,9 @@ export function usePomodoro(userId: string | undefined, date: string) {
     )
 
     if (s.sessionId && userIdRef.current) {
-      const newCycles = s.mode === 'focus' ? s.cycles + 1 : s.cycles
+      // completed_cycles is per-session: 1 for a focus block completion, 0 for a break.
+      // The hydration query sums these to get the total cycles today.
+      const newCycles = s.mode === 'focus' ? 1 : 0
       await supabase
         .from('pomodoro_sessions')
         .update({

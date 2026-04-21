@@ -10,6 +10,7 @@ interface Props {
   onRunningChange?: (running: boolean) => void
   onTimeLeftChange?: (timeLeft: number | null) => void
   onBreakRequest?: () => void
+  onNavigate?: (tab: string) => void
 }
 
 const MODE_LABELS: Record<PomodoroMode, string> = {
@@ -55,7 +56,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
   'Meals':         '🍽️',
 }
 
-export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLeftChange, onBreakRequest }: Props) {
+export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLeftChange, onBreakRequest, onNavigate }: Props) {
   // Pass date into the hook so hydration re-runs on midnight rollover
   const { state, start, pause, reset, abandon, addDistraction, setTask, switchMode } = usePomodoro(userId, date)
 
@@ -334,8 +335,8 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
         </div>
       )}
 
-      {/* Motivational pull-quote — shown before the user starts a focus session */}
-      {mode === 'focus' && !isRunning && !state.sessionId && vaultEntry && (
+      {/* Motivational pull-quote — shown before every focus session start */}
+      {mode === 'focus' && !isRunning && vaultEntry && (
         <div className="w-full bg-gradient-to-r from-orange-950/40 to-red-950/30 border border-orange-800/30 rounded-xl px-4 py-3">
           <div className="flex items-center gap-2 mb-1.5">
             <Flame className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
@@ -345,6 +346,19 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
           </div>
           <p className="text-gray-200 text-xs leading-relaxed italic">"{vaultEntry.content}"</p>
         </div>
+      )}
+
+      {/* Empty vault nudge — shown when no vault entries exist yet */}
+      {mode === 'focus' && !isRunning && !vaultEntry && (
+        <button
+          onClick={() => onNavigate?.('vault')}
+          className="w-full flex items-center gap-3 bg-orange-950/20 border border-orange-800/20 hover:border-orange-700/40 rounded-xl px-4 py-3 transition-colors text-left"
+        >
+          <Flame className="w-4 h-4 text-orange-500/60 flex-shrink-0" />
+          <p className="text-gray-500 text-xs leading-relaxed">
+            Add fuel to your vault → it'll show here before every session.
+          </p>
+        </button>
       )}
 
       {/* Break suggestion */}

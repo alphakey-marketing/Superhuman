@@ -41,10 +41,10 @@ export function useStreaks(userId: string | undefined, today: string) {
         })
       )].sort((a, b) => b.localeCompare(a))
 
-      // yesterday relative to the `today` param (not new Date() at render time)
-      const yesterdayDate = new Date(today)
-      yesterdayDate.setDate(yesterdayDate.getDate() - 1)
-      const yesterday = yesterdayDate.toISOString().split('T')[0]
+      // yesterday relative to the `today` param, computed in local timezone
+      const [ty, tm, td] = today.split('-').map(Number)
+      const yesterdayDate = new Date(ty, tm - 1, td - 1) // local midnight the day before
+      const yesterday = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')}`
 
       let current = 0
       let longest = 0
