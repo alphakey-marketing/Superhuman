@@ -3,6 +3,7 @@ import { Brain, LayoutDashboard, Target, Timer, LogOut, Menu, X, BarChart2, Dumb
 import { useAuth } from './hooks/useAuth'
 import { useDistraction } from './hooks/useDistraction'
 import { supabase } from './lib/supabase'
+import { toLocalDateStr } from './lib/date'
 import LoginForm from './components/Auth/LoginForm'
 import BudgetPlanner from './components/Budget/BudgetPlanner'
 import PomodoroTimer from './components/Pomodoro/PomodoroTimer'
@@ -34,8 +35,7 @@ const tabs = [
 ]
 
 function getTodayStr() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return toLocalDateStr()
 }
 
 function getTodayLabel() {

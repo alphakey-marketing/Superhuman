@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { toLocalDateStr } from '../lib/date'
 
 export interface StreakData {
   current: number
@@ -35,16 +36,12 @@ export function useStreaks(userId: string | undefined, today: string) {
       // Get unique active dates in local timezone (desc)
       // started_at is stored as UTC; convert to local date string to avoid off-by-one errors
       const activeDates = [...new Set(
-        data.map(s => {
-          const d = new Date(s.started_at)
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-        })
+        data.map(s => toLocalDateStr(new Date(s.started_at)))
       )].sort((a, b) => b.localeCompare(a))
 
       // yesterday relative to the `today` param, computed in local timezone
       const [ty, tm, td] = today.split('-').map(Number)
-      const yesterdayDate = new Date(ty, tm - 1, td - 1) // local midnight the day before
-      const yesterday = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')}`
+      const yesterday = toLocalDateStr(new Date(ty, tm - 1, td - 1))
 
       let current = 0
       let longest = 0

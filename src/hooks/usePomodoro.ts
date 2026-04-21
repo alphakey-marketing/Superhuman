@@ -179,6 +179,9 @@ export function usePomodoro(userId: string | undefined, date: string) {
     if (s.sessionId && userIdRef.current) {
       // completed_cycles is per-session: 1 for a focus block completion, 0 for a break.
       // The hydration query sums these to get the total cycles today.
+      // NOTE: sessions created before this fix may have stored a cumulative running total
+      // in this field; those rows will inflate the hydrated count on reload for existing
+      // users, but new sessions from this point forward are stored correctly.
       const newCycles = s.mode === 'focus' ? 1 : 0
       await supabase
         .from('pomodoro_sessions')
