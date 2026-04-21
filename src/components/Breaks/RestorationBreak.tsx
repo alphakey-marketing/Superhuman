@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Wind, Leaf, Music, ChevronRight, Smile, Meh, Frown } from 'lucide-react'
+import { X, Wind, Leaf, Music, ChevronRight, Smile, Meh, Frown, Flame } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { BREAK_DURATIONS } from '../../types'
+import { BREAK_DURATIONS, MotivationEntry, VAULT_TYPES } from '../../types'
 
 interface Props {
   userId: string
@@ -141,8 +141,25 @@ export default function RestorationBreak({ userId, onClose }: Props) {
   const [breathPhase, setBreathPhase] = useState<'inhale'|'hold1'|'exhale'|'hold2'>('inhale')
   const [breathCount, setBreathCount] = useState(0)
   const [natureImg, setNatureImg] = useState(NATURE_IMAGES[0])
+  const [vaultEntry, setVaultEntry] = useState<MotivationEntry | null>(null)
   const stopAudio = useRef<() => void>(() => {})
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Fetch a random vault entry to show during the break
+  useEffect(() => {
+    const loadVault = async () => {
+      const { data } = await supabase
+        .from('motivation_vault')
+        .select('*')
+        .eq('user_id', userId)
+        .order('is_pinned', { ascending: false })
+        .limit(20)
+      if (data && data.length > 0) {
+        setVaultEntry(data[Math.floor(Math.random() * data.length)])
+      }
+    }
+    loadVault()
+  }, [userId])
 
   // Breathing cycle: 4s inhale → 4s hold → 4s exhale → 4s hold
   useEffect(() => {
@@ -377,6 +394,23 @@ export default function RestorationBreak({ userId, onClose }: Props) {
                   style={{ width: `${progress}%`, backgroundColor: option.color }}
                 />
               </div>
+
+              {/* Vault fuel card */}
+              {vaultEntry && (
+                <div className="bg-gradient-to-r from-orange-950/40 to-red-950/30 border border-orange-800/30 rounded-xl px-3 py-2.5">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Flame className="w-3 h-3 text-orange-400 flex-shrink-0" />
+                    <span className="text-orange-400 text-xs font-medium">Fuel for the next round</span>
+                  </div>
+                  <p className="text-gray-300 text-xs leading-relaxed italic">
+                    "{vaultEntry.content}"
+                  </p>
+                  <p className="text-gray-600 text-[10px] mt-1">
+                    {VAULT_TYPES[vaultEntry.type].emoji} {VAULT_TYPES[vaultEntry.type].label}
+                  </p>
+                </div>
+              )}
+
               <button
                 onClick={handleSessionComplete}
                 className="w-full py-2.5 text-gray-500 hover:text-white text-sm border border-gray-800 hover:border-gray-600 rounded-xl transition-colors"

@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Brain, LayoutDashboard, Target, Timer, LogOut, Menu, X, BarChart2, Leaf, Dumbbell, Flame } from 'lucide-react'
+import { Brain, LayoutDashboard, Target, Timer, LogOut, Menu, X, BarChart2, Dumbbell, Flame } from 'lucide-react'
 import { useAuth } from './hooks/useAuth'
 import { useDistraction } from './hooks/useDistraction'
+import { supabase } from './lib/supabase'
+import { toLocalDateStr } from './lib/date'
 import LoginForm from './components/Auth/LoginForm'
 import BudgetPlanner from './components/Budget/BudgetPlanner'
 import PomodoroTimer from './components/Pomodoro/PomodoroTimer'
@@ -17,7 +19,6 @@ import UATBanner from './components/UATBanner'
 
 type Tab = 'dashboard' | 'budget' | 'pomodoro' | 'analytics' | 'practice' | 'vault'
 
-const ONBOARDING_KEY = 'attentionos_onboarded_v1'
 const MS_24H = 24 * 60 * 60 * 1000
 
 // Stamped once when the JS bundle first loads — survives re-renders but not a
@@ -30,11 +31,11 @@ const tabs = [
   { id: 'pomodoro'  as Tab, label: 'Timer',     shortLabel: 'Timer', icon: Timer },
   { id: 'analytics' as Tab, label: 'Analytics', shortLabel: 'Stats', icon: BarChart2 },
   { id: 'practice'  as Tab, label: 'Practice',  shortLabel: 'Train', icon: Dumbbell },
-  { id: 'vault'     as Tab, label: 'Vault',     shortLabel: 'Vault', icon: Flame },
+  { id: 'vault'     as Tab, label: 'Fuel',      shortLabel: 'Fuel',  icon: Flame },
 ]
 
 function getTodayStr() {
-  return new Date().toISOString().split('T')[0]
+  return toLocalDateStr()
 }
 
 function getTodayLabel() {
@@ -126,14 +127,13 @@ export default function App() {
   useDistraction(user?.id, pomodoroRunning)
 
   useEffect(() => {
-    if (user && !localStorage.getItem(ONBOARDING_KEY)) {
+    if (user && !user.user_metadata?.attentionos_onboarded) {
       setShowOnboarding(true)
     }
   }, [user])
 
   // ── QuickStart badge check ──────────────────────────────────────────────
   const checkBadges = useCallback(async (uid: string, date: string) => {
-    const { supabase } = await import('./lib/supabase')
     const [{ data: b }, { data: s }, { data: sk }] = await Promise.all([
       supabase.from('attention_budgets').select('id').eq('user_id', uid).eq('date', date).limit(1),
       supabase.from('pomodoro_sessions').select('id').eq('user_id', uid).gte('started_at', date).limit(1),
@@ -147,7 +147,7 @@ export default function App() {
   useEffect(() => {
     if (!user) return
     checkBadges(user.id, today)
-  }, [user, today, activeTab, checkBadges])
+  }, [user, today, checkBadges])
 
   // Re-check badges on visibility restore (covers overnight open case)
   useEffect(() => {
@@ -160,8 +160,13 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [user, checkBadges])
 
-  const handleOnboardingDone = () => {
-    localStorage.setItem(ONBOARDING_KEY, '1')
+  const handleOnboardingDone = async () => {
+    try {
+      await supabase.auth.updateUser({ data: { attentionos_onboarded: true } })
+    } catch (err) {
+      console.warn('[App] Could not store onboarding flag in user metadata, falling back to localStorage:', err)
+      localStorage.setItem('attentionos_onboarded_v1', '1')
+    }
     setShowOnboarding(false)
   }
 
@@ -214,13 +219,6 @@ export default function App() {
               </button>
             )}
             <button
-              onClick={() => setShowBreak(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-800/40 text-emerald-400 text-xs rounded-lg transition-colors"
-            >
-              <Leaf className="w-3.5 h-3.5" />
-              <span>Break</span>
-            </button>
-            <button
               onClick={() => signOut()}
               className="hidden sm:flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-xs transition-colors px-2 py-1 rounded-lg hover:bg-gray-800"
             >
@@ -233,9 +231,6 @@ export default function App() {
         </div>
         {menuOpen && (
           <div className="sm:hidden border-t border-gray-800 bg-gray-900 px-4 py-3 space-y-2">
-            <button onClick={() => { setShowBreak(true); setMenuOpen(false) }} className="flex items-center gap-2 text-emerald-400 text-sm">
-              <Leaf className="w-4 h-4" /> Take a Break
-            </button>
             <button onClick={() => { signOut(); setMenuOpen(false) }} className="flex items-center gap-2 text-gray-400 text-sm">
               <LogOut className="w-4 h-4" /> Sign Out
             </button>
@@ -284,8 +279,19 @@ export default function App() {
                 hasSessions={hasSessions}
                 hasSkills={hasSkills}
               />
-              <StreakWidget userId={user.id} today={today} />
               <Dashboard userId={user.id} today={today} onNavigate={(tab) => setActiveTab(tab as Tab)} />
+              {/* Quick-add fuel shortcut */}
+              <button
+                onClick={() => setActiveTab('vault')}
+                className="w-full flex items-center gap-3 bg-gradient-to-r from-orange-950/30 to-red-950/20 border border-orange-800/30 hover:border-orange-700/50 rounded-2xl px-4 py-3 transition-colors text-left"
+              >
+                <Flame className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-orange-300 text-sm font-medium">Add fuel to your vault</p>
+                  <p className="text-gray-500 text-xs mt-0.5">Store your motivation — it shows up before every session.</p>
+                </div>
+                <span className="text-orange-500 text-xs">→</span>
+              </button>
             </div>
           </>
         )}
@@ -309,14 +315,17 @@ export default function App() {
           <>
             <div className="mb-3">
               <h2 className="text-xl font-bold text-white">Analytics</h2>
-              <p className="text-gray-500 text-sm mt-0.5">Your distraction patterns this week</p>
+              <p className="text-gray-500 text-sm mt-0.5">Your focus stats and distraction patterns</p>
             </div>
             <div className="bg-indigo-950/30 border border-indigo-900/40 rounded-xl px-4 py-3 mb-4">
               <p className="text-indigo-300 text-xs leading-relaxed">
                 💡 <strong>How this works:</strong> Every time you switch tabs during a Pomodoro, it’s auto-logged. Review your patterns here to find your biggest distraction triggers.
               </p>
             </div>
-            <DistractionTracker userId={user.id} today={today} />
+            <div className="space-y-4">
+              <StreakWidget userId={user.id} today={today} />
+              <DistractionTracker userId={user.id} today={today} />
+            </div>
           </>
         )}
 
@@ -338,7 +347,7 @@ export default function App() {
         {activeTab === 'vault' && (
           <>
             <div className="mb-3">
-              <h2 className="text-xl font-bold text-white">Motivation Vault</h2>
+              <h2 className="text-xl font-bold text-white">Fuel</h2>
               <p className="text-gray-500 text-sm mt-0.5">Your fuel. Your proof. Your fire.</p>
             </div>
             <div className="bg-orange-950/30 border border-orange-900/40 rounded-xl px-4 py-3 mb-4">
@@ -365,6 +374,8 @@ export default function App() {
             date={today}
             onRunningChange={setPomodoroRunning}
             onTimeLeftChange={setPomodoroTimeLeft}
+            onBreakRequest={() => setShowBreak(true)}
+            onNavigate={(tab) => setActiveTab(tab as Tab)}
           />
         </div>
 

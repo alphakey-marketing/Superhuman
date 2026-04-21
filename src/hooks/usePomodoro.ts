@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 import { PomodoroMode, POMODORO_DURATIONS } from '../types'
-import { supabase } from '../lib/supabase'
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/supabase'
 
 interface PomodoroState {
   mode: PomodoroMode
@@ -21,7 +21,7 @@ type PomodoroAction =
   | { type: 'PAUSE' }
   | { type: 'RESET' }
   | { type: 'SET_TIME_LEFT'; timeLeft: number }
-  | { type: 'NEXT_MODE'; mode: PomodoroMode }
+  | { type: 'NEXT_MODE'; mode: PomodoroMode; incrementCycles?: boolean }
   | { type: 'ADD_DISTRACTION' }
   | { type: 'SET_TASK'; label: string; budgetCategory: string | null; budgetRowId: string | null }
   | { type: 'SET_SESSION_ID'; id: string }
@@ -49,7 +49,7 @@ function reducer(state: PomodoroState, action: PomodoroAction): PomodoroState {
         mode: action.mode,
         timeLeft: POMODORO_DURATIONS[action.mode],
         isRunning: false,
-        cycles: action.mode !== 'focus' ? state.cycles + 1 : state.cycles,
+        cycles: action.incrementCycles ? state.cycles + 1 : state.cycles,
         sessionId: null,
         sessionDistractions: 0,
       }
@@ -127,6 +127,22 @@ export function usePomodoro(userId: string | undefined, date: string) {
   stateRef.current           = state
   const startEpochRef        = useRef<number | null>(null)
   const elapsedAtPauseRef    = useRef<number>(0)
+  // Keep userId always fresh — avoids stale closure after token refresh
+  const userIdRef            = useRef(userId)
+  useEffect(() => { userIdRef.current = userId }, [userId])
+  // Keep current access token fresh for the beforeunload handler
+  const accessTokenRef       = useRef<string | null>(null)
+  useEffect(() => {
+    // Seed immediately from current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      accessTokenRef.current = session?.access_token ?? null
+    })
+    // Keep up-to-date on token refresh / sign-in / sign-out
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      accessTokenRef.current = session?.access_token ?? null
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   // ── Hydrate cycles + distractions from DB on mount / date change ────────────
   useEffect(() => {
@@ -160,8 +176,13 @@ export function usePomodoro(userId: string | undefined, date: string) {
         : 'Break over - ready for the next focus block?'
     )
 
-    if (s.sessionId && userId) {
-      const newCycles = s.mode === 'focus' ? s.cycles + 1 : s.cycles
+    if (s.sessionId && userIdRef.current) {
+      // completed_cycles is per-session: 1 for a focus block completion, 0 for a break.
+      // The hydration query sums these to get the total cycles today.
+      // NOTE: sessions created before this fix may have stored a cumulative running total
+      // in this field; those rows will inflate the hydrated count on reload for existing
+      // users, but new sessions from this point forward are stored correctly.
+      const newCycles = s.mode === 'focus' ? 1 : 0
       await supabase
         .from('pomodoro_sessions')
         .update({
@@ -192,11 +213,11 @@ export function usePomodoro(userId: string | undefined, date: string) {
     if (s.mode === 'focus') {
       const nextCycles = s.cycles + 1
       const nextMode: PomodoroMode = nextCycles % 4 === 0 ? 'long_break' : 'short_break'
-      dispatch({ type: 'NEXT_MODE', mode: nextMode })
+      dispatch({ type: 'NEXT_MODE', mode: nextMode, incrementCycles: true })
     } else {
       dispatch({ type: 'NEXT_MODE', mode: 'focus' })
     }
-  }, [userId])
+  }, [])
 
   const computeAndSync = useCallback(() => {
     if (!stateRef.current.isRunning || startEpochRef.current === null) return
@@ -240,11 +261,11 @@ export function usePomodoro(userId: string | undefined, date: string) {
 
   const start = useCallback(async () => {
     dispatch({ type: 'START' })
-    if (!stateRef.current.sessionId && userId) {
+    if (!stateRef.current.sessionId && userIdRef.current) {
       const { data } = await supabase
         .from('pomodoro_sessions')
         .insert({
-          user_id: userId,
+          user_id: userIdRef.current,
           task_label: stateRef.current.taskLabel || null,
           budget_category: stateRef.current.budgetCategory || null,
         })
@@ -252,7 +273,7 @@ export function usePomodoro(userId: string | undefined, date: string) {
         .single()
       if (data) dispatch({ type: 'SET_SESSION_ID', id: data.id })
     }
-  }, [userId])
+  }, [])
 
   const abandon = useCallback(async () => {
     dispatch({ type: 'PAUSE' })
@@ -265,6 +286,41 @@ export function usePomodoro(userId: string | undefined, date: string) {
         .eq('id', stateRef.current.sessionId)
     }
     dispatch({ type: 'RESET' })
+  }, [])
+
+  // Mark the active session as abandoned when the user closes/reloads the tab
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      const s = stateRef.current
+      if (!s.sessionId || !s.isRunning) return
+
+      // Use the token maintained via onAuthStateChange — avoids dependence on
+      // undocumented Supabase localStorage key formats that may change across
+      // SDK version upgrades.
+      const accessToken = accessTokenRef.current
+      if (!accessToken) return
+
+      const url = `${SUPABASE_URL}/rest/v1/pomodoro_sessions?id=eq.${s.sessionId}`
+      const body = JSON.stringify({ ended_at: new Date().toISOString(), status: 'abandoned' })
+      // Use fetch with keepalive so the browser sends the request even as the page unloads
+      try {
+        fetch(url, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${accessToken}`,
+            Prefer: 'return=minimal',
+          },
+          body,
+          keepalive: true,
+        })
+      } catch (err) {
+        console.warn('[usePomodoro] beforeunload: failed to mark session abandoned:', err)
+      }
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [])
 
   const setTask = useCallback((
