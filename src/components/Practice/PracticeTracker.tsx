@@ -140,7 +140,6 @@ function TodayQueue({
   onQuickLog: (skillId: string, subSkillId: string | null, mins: number) => void
 }) {
   const today = toLocalDateStr()
-  const todayMs = new Date(today + 'T00:00:00').getTime()
   const now = Date.now()
 
   // For each skill, find the sub-skill with the oldest last practice date
