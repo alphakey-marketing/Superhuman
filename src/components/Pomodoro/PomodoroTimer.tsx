@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Play, Pause, RotateCcw, AlertTriangle, ChevronRight, Leaf, Flame } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Play, Pause, RotateCcw, AlertTriangle, ChevronRight, Leaf, Flame, Dumbbell } from 'lucide-react'
 import { usePomodoro } from '../../hooks/usePomodoro'
-import { PomodoroMode, AttentionBudget, CATEGORY_COLORS, MotivationEntry, VAULT_TYPES } from '../../types'
+import { PomodoroMode, AttentionBudget, CATEGORY_COLORS, MotivationEntry, VAULT_TYPES, PracticeSkill, PracticeSubSkill } from '../../types'
 import { supabase } from '../../lib/supabase'
+import { toLocalDateStr } from '../../lib/date'
 
 interface Props {
   userId: string
@@ -66,6 +67,15 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
   const [taskNote, setTaskNote]           = useState('')
   const [vaultEntry, setVaultEntry]       = useState<MotivationEntry | null>(null)
 
+  // Practice Mode state
+  const [practiceMode, setPracticeMode]               = useState(false)
+  const [practiceSkills, setPracticeSkills]           = useState<PracticeSkill[]>([])
+  const [practiceSubSkills, setPracticeSubSkills]     = useState<PracticeSubSkill[]>([])
+  const [practiceSkillsLoaded, setPracticeSkillsLoaded] = useState(false)
+  const [selectedPracticeSkillId, setSelectedPracticeSkillId]     = useState<string | null>(null)
+  const [selectedPracticeSubSkillId, setSelectedPracticeSubSkillId] = useState<string | null>(null)
+  const prevCyclesRef = useRef(0)
+
   const { mode, timeLeft, isRunning, cycles, distractions, sessionDistractions } = state
 
   // Bubble timeLeft up so the header mini-pill is always live
@@ -109,21 +119,86 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
   }, [loadBudgets, isRunning])
 
   // Fetch a random vault entry for the pre-start motivational pull-quote
-  useEffect(() => {
-    const loadVaultEntry = async () => {
-      const { data } = await supabase
-        .from('motivation_vault')
-        .select('*')
-        .eq('user_id', userId)
-        .order('is_pinned', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(20)
-      if (data && data.length > 0) {
-        setVaultEntry(data[Math.floor(Math.random() * data.length)])
-      }
+  const loadVaultEntry = useCallback(async () => {
+    const { data } = await supabase
+      .from('motivation_vault')
+      .select('*')
+      .eq('user_id', userId)
+      .order('is_pinned', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(20)
+    if (data && data.length > 0) {
+      setVaultEntry(data[Math.floor(Math.random() * data.length)])
     }
-    loadVaultEntry()
   }, [userId])
+
+  // Initial vault load on mount / userId change
+  useEffect(() => {
+    loadVaultEntry()
+  }, [loadVaultEntry])
+
+  // Re-fetch vault when user returns to this tab (picks up entries added in Vault tab)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !isRunning) loadVaultEntry()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [loadVaultEntry, isRunning])
+
+  // Fetch practice skills/sub-skills when practice mode is toggled on
+  useEffect(() => {
+    if (!practiceMode) return
+    const load = async () => {
+      setPracticeSkillsLoaded(false)
+      const [{ data: sk }, { data: sub }] = await Promise.all([
+        supabase.from('practice_skills').select('*').eq('user_id', userId).order('created_at'),
+        supabase.from('practice_sub_skills').select('*').eq('user_id', userId).order('created_at'),
+      ])
+      setPracticeSkills(sk ?? [])
+      setPracticeSubSkills(sub ?? [])
+      setPracticeSkillsLoaded(true)
+    }
+    load()
+  }, [practiceMode, userId])
+
+  // Auto-log a practice session when a cycle completes in practice mode
+  // Initialize ref to current cycles to avoid triggering on first hydration
+  useEffect(() => {
+    prevCyclesRef.current = cycles
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (cycles > prevCyclesRef.current && practiceMode && selectedPracticeSkillId) {
+      const autoLog = async () => {
+        const today = toLocalDateStr()
+        const { data: sessionData } = await supabase.from('practice_sessions').insert({
+          user_id: userId,
+          skill_id: selectedPracticeSkillId,
+          sub_skill_id: selectedPracticeSubSkillId ?? null,
+          date: today,
+          duration_minutes: 25,
+          difficulty: 3,
+          quality: 3,
+          target_weakness: taskNote.trim() || null,
+          notes: taskNote.trim() ? `[Pomodoro] ${taskNote.trim()}` : '[Pomodoro auto-logged]',
+        }).select().single()
+        if (sessionData) {
+          // Update skill total_hours client-side
+          setPracticeSkills(prev => prev.map(s => s.id === selectedPracticeSkillId
+            ? { ...s, total_hours: s.total_hours + 25 / 60 }
+            : s
+          ))
+        }
+      }
+      autoLog()
+    }
+    prevCyclesRef.current = cycles
+  }, [cycles])
 
   // Push selection into hook
   useEffect(() => {
@@ -206,11 +281,108 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
       {/* Focus picker — only in focus mode */}
       {mode === 'focus' && (
         <div className="w-full space-y-2">
-          {!budgetsLoaded ? (
-            <div className="h-10 rounded-xl bg-gray-800 animate-pulse" />
-          ) : budgets.length > 0 ? (
-            <div>
-              <p className="text-gray-500 text-xs mb-1.5 px-1">What are you working on?</p>
+
+          {/* Practice Mode toggle */}
+          <div className="flex items-center justify-between px-1 mb-1">
+            <span className="text-gray-500 text-xs">What are you working on?</span>
+            <button
+              disabled={isRunning}
+              onClick={() => {
+                setPracticeMode(p => !p)
+                setSelectedPracticeSkillId(null)
+                setSelectedPracticeSubSkillId(null)
+                setSelectedBudgetId('')
+              }}
+              className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                practiceMode
+                  ? 'bg-emerald-900/40 border-emerald-700/60 text-emerald-300'
+                  : 'bg-gray-800 border-gray-700 text-gray-500 hover:border-gray-600 hover:text-gray-400'
+              }`}
+            >
+              <Dumbbell className="w-3 h-3" />
+              Practice Mode
+            </button>
+          </div>
+
+          {practiceMode ? (
+            /* ── Practice skill picker ── */
+            !practiceSkillsLoaded ? (
+              <div className="h-10 rounded-xl bg-gray-800 animate-pulse" />
+            ) : practiceSkills.length === 0 ? (
+              <div className="bg-emerald-950/20 border border-emerald-800/30 rounded-xl px-4 py-3">
+                <p className="text-emerald-300 text-xs leading-relaxed">
+                  💡 No skills found. Go to the <strong>Practice</strong> tab to add your first skill.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {/* Step 1: pick skill */}
+                <div className="grid grid-cols-2 gap-1.5">
+                  {practiceSkills.map(sk => (
+                    <button
+                      key={sk.id}
+                      disabled={isRunning}
+                      onClick={() => {
+                        setSelectedPracticeSkillId(sk.id === selectedPracticeSkillId ? null : sk.id)
+                        setSelectedPracticeSubSkillId(null)
+                      }}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                        selectedPracticeSkillId === sk.id
+                          ? 'border-opacity-100 text-white'
+                          : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-200'
+                      }`}
+                      style={selectedPracticeSkillId === sk.id ? {
+                        backgroundColor: sk.color + '22',
+                        borderColor: sk.color,
+                        color: sk.color,
+                      } : {}}
+                    >
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: sk.color }} />
+                      <span className="text-xs font-medium truncate">{sk.name}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Step 2: pick sub-skill (only when a skill is selected) */}
+                {selectedPracticeSkillId && (() => {
+                  const subs = practiceSubSkills.filter(s => s.skill_id === selectedPracticeSkillId)
+                  if (subs.length === 0) return null
+                  return (
+                    <div>
+                      <p className="text-gray-600 text-[10px] px-1 mb-1">Focus area (optional)</p>
+                      <div className="flex gap-1.5 flex-wrap">
+                        <button
+                          disabled={isRunning}
+                          onClick={() => setSelectedPracticeSubSkillId(null)}
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors disabled:opacity-50 ${
+                            selectedPracticeSubSkillId === null
+                              ? 'bg-emerald-700/40 border-emerald-600/60 text-emerald-200'
+                              : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600'
+                          }`}
+                        >General</button>
+                        {subs.map(sub => (
+                          <button
+                            key={sub.id}
+                            disabled={isRunning}
+                            onClick={() => setSelectedPracticeSubSkillId(sub.id === selectedPracticeSubSkillId ? null : sub.id)}
+                            className={`text-xs px-3 py-1.5 rounded-full border transition-colors disabled:opacity-50 ${
+                              selectedPracticeSubSkillId === sub.id
+                                ? 'bg-emerald-700/40 border-emerald-600/60 text-emerald-200'
+                                : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600'
+                            }`}
+                          >{sub.name}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+            )
+          ) : (
+            /* ── Budget picker ── */
+            !budgetsLoaded ? (
+              <div className="h-10 rounded-xl bg-gray-800 animate-pulse" />
+            ) : budgets.length > 0 ? (
               <div className="grid grid-cols-2 gap-1.5">
                 <button
                   disabled={isRunning}
@@ -249,18 +421,22 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
                   </button>
                 ))}
               </div>
-            </div>
-          ) : (
-            <div className="bg-amber-950/20 border border-amber-800/30 rounded-xl px-4 py-3">
-              <p className="text-amber-300 text-xs leading-relaxed">
-                💡 You haven’t set a plan for today yet. Go to <strong>Planner</strong> to allocate your hours — then this picker will show your categories.
-              </p>
-            </div>
+            ) : (
+              <div className="bg-amber-950/20 border border-amber-800/30 rounded-xl px-4 py-3">
+                <p className="text-amber-300 text-xs leading-relaxed">
+                  💡 You haven't set a plan for today yet. Go to <strong>Planner</strong> to allocate your hours — then this picker will show your categories.
+                </p>
+              </div>
+            )
           )}
 
           <input
             type="text"
-            placeholder={selectedBudget ? `Specific task within ${selectedBudget.category} (optional)` : 'Specific task (optional)'}
+            placeholder={practiceMode && selectedPracticeSkillId
+              ? 'Weakness to target this session (optional)'
+              : selectedBudget
+                ? `Specific task within ${selectedBudget.category} (optional)`
+                : 'Specific task (optional)'}
             value={taskNote}
             disabled={isRunning}
             onChange={e => setTaskNote(e.target.value)}

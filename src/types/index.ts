@@ -46,6 +46,7 @@ export interface PracticeSkill {
   color: string
   target_hours: number
   total_hours: number
+  weekly_goal_hours: number
   created_at: string
 }
 
@@ -67,6 +68,8 @@ export interface PracticeSession {
   difficulty: number
   quality: number
   notes: string | null
+  target_weakness: string | null
+  next_intention: string | null
   created_at: string
 }
 
