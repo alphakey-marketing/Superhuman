@@ -172,7 +172,7 @@ function TodayQueue({
         : Infinity
       // Only show if not practiced today
       const practicedToday = sessions.some(
-        s => s.skill_id === skill.id && s.sub_skill_id === oldestSubSkill!.id && s.date === today
+        s => s.skill_id === skill.id && s.sub_skill_id === oldestSubSkill.id && s.date === today
       )
       if (!practicedToday) {
         queue.push({ skill, subSkill: oldestSubSkill, daysSince, lastDate: oldestDate })

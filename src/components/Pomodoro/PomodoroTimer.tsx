@@ -75,6 +75,17 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
   const [selectedPracticeSkillId, setSelectedPracticeSkillId]     = useState<string | null>(null)
   const [selectedPracticeSubSkillId, setSelectedPracticeSubSkillId] = useState<string | null>(null)
   const prevCyclesRef = useRef(0)
+  // Keep practice mode state in refs to avoid stale closures in the cycles effect
+  const practiceModeRef             = useRef(practiceMode)
+  const selectedPracticeSkillIdRef  = useRef(selectedPracticeSkillId)
+  const selectedPracticeSubSkillIdRef = useRef(selectedPracticeSubSkillId)
+  const taskNoteRef                 = useRef(taskNote)
+  const userIdRef                   = useRef(userId)
+  practiceModeRef.current             = practiceMode
+  selectedPracticeSkillIdRef.current  = selectedPracticeSkillId
+  selectedPracticeSubSkillIdRef.current = selectedPracticeSubSkillId
+  taskNoteRef.current                 = taskNote
+  userIdRef.current                   = userId
 
   const { mode, timeLeft, isRunning, cycles, distractions, sessionDistractions } = state
 
@@ -167,29 +178,32 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
   }, [practiceMode, userId])
 
   // Auto-log a practice session when a cycle completes in practice mode
-  // Initialize ref to current cycles to avoid triggering on first hydration
+  // Sync prevCyclesRef after hydration so we don't false-trigger on the initial state load
   useEffect(() => {
-    prevCyclesRef.current = cycles
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (state.hydrated) {
+      prevCyclesRef.current = cycles
+    }
+  }, [state.hydrated])
 
   useEffect(() => {
-    if (cycles > prevCyclesRef.current && practiceMode && selectedPracticeSkillId) {
+    const skillId = selectedPracticeSkillIdRef.current
+    if (cycles > prevCyclesRef.current && practiceModeRef.current && skillId) {
       const autoLog = async () => {
         const today = toLocalDateStr()
+        const note = taskNoteRef.current.trim()
         const { data: sessionData } = await supabase.from('practice_sessions').insert({
-          user_id: userId,
-          skill_id: selectedPracticeSkillId,
-          sub_skill_id: selectedPracticeSubSkillId ?? null,
+          user_id: userIdRef.current,
+          skill_id: skillId,
+          sub_skill_id: selectedPracticeSubSkillIdRef.current ?? null,
           date: today,
           duration_minutes: 25,
           difficulty: 3,
           quality: 3,
-          target_weakness: taskNote.trim() || null,
-          notes: taskNote.trim() ? `[Pomodoro] ${taskNote.trim()}` : '[Pomodoro auto-logged]',
+          target_weakness: note || null,
+          notes: note ? `[Pomodoro] ${note}` : '[Pomodoro auto-logged]',
         }).select().single()
         if (sessionData) {
-          // Update skill total_hours client-side
-          setPracticeSkills(prev => prev.map(s => s.id === selectedPracticeSkillId
+          setPracticeSkills(prev => prev.map(s => s.id === skillId
             ? { ...s, total_hours: s.total_hours + 25 / 60 }
             : s
           ))
