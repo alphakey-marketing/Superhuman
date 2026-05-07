@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
-import { Plus, Trash2, GripVertical, ChevronDown, ChevronUp, Info, Zap } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, HelpCircle, Zap, Info, ChevronDown, ChevronUp } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { AttentionBudget, CATEGORY_COLORS } from '../../types'
 
@@ -27,7 +26,7 @@ const CATEGORY_META: Record<string, { emoji: string; what: string; examples: str
   },
   'Admin': {
     emoji: '📋',
-    what: "Routine, low-focus tasks that keep things running but don't stretch your brain.",
+    what: "Routine, low-focus tasks that keep things running but don\'t stretch your brain.",
     examples: 'Emails, meetings, scheduling, filing, form-filling, quick replies',
   },
   'Exercise': {
@@ -64,7 +63,7 @@ const FRAGMENT_SLOTS = [
     duration: '30–60 min',
     emoji: '🚇',
     color: '#6366f1',
-    context: 'You\'re in transit — hands and eyes are occupied. Your brain is fresh but can\'t read or type.',
+    context: "You\'re in transit — hands and eyes are occupied. Your brain is fresh but can\'t read or type.",
     best: 'Audio Learning',
     bestEmoji: '📚',
     why: 'This is the single best slot for podcasts, audiobooks, and language apps. Your mind is alert and distraction-free. 5 commute-days/week = 4+ hours of learning that cost you nothing.',
@@ -82,7 +81,7 @@ const FRAGMENT_SLOTS = [
     duration: '30–60 min',
     emoji: '🌆',
     color: '#f59e0b',
-    context: 'Your brain is fatigued after a full day. Cognitive capacity is low. You\'re transitioning from work to home.',
+    context: "Your brain is fatigued after a full day. Cognitive capacity is low. You\'re transitioning from work to home.",
     best: 'Rest or Light Audio',
     bestEmoji: '😴',
     why: 'The evening commute is a natural decompression window. Using it to mentally "switch off" means you arrive home present — not still at the office in your head. This directly improves sleep quality.',
@@ -118,17 +117,17 @@ const FRAGMENT_SLOTS = [
     duration: '5–10 min',
     emoji: '⚡',
     color: '#ec4899',
-    context: 'Tiny windows between calls, meetings, or tasks. Too short to start deep work. Easy to waste on reflexive phone-checking.',
+    context: "Tiny windows between calls, meetings, or tasks. Too short to start deep work. Easy to waste on reflexive phone-checking.",
     best: 'Capture + Reset',
     bestEmoji: '✍️',
-    why: 'Five minutes isn\'t enough to do deep work, but it\'s perfect for capturing thoughts, clearing your head, and setting up the next task. Top performers use these gaps intentionally — everyone else loses them to the feed.',
+    why: "Five minutes isn\'t enough to do deep work, but it\'s perfect for capturing thoughts, clearing your head, and setting up the next task. Top performers use these gaps intentionally — everyone else loses them to the feed.",
     tactics: [
-      'Write down one thought, idea, or task that\'s in your head (brain dump)',
+      "Write down one thought, idea, or task that\'s in your head (brain dump)",
       'Stand up, stretch, look out a window for 60 seconds — resets focus',
       'Review your task list and pick the single next action',
       'Take 5 slow breaths — lowers cortisol and primes for the next block',
     ],
-    avoid: 'Opening Instagram, TikTok, or news — you\'ll get pulled in and your "5 minutes" becomes 25.',
+    avoid: "Opening Instagram, TikTok, or news — you\'ll get pulled in and your \"5 minutes\" becomes 25.",
   },
   {
     id: 'micro-waiting',
@@ -159,12 +158,12 @@ const FRAGMENT_SLOTS = [
     bestEmoji: '📋',
     why: 'Fighting the dip with deep work is the wrong move — you produce lower quality output and it frustrates you. Instead, schedule your lowest-cognitive tasks here and save the afternoon for a second deep work block at 4–6 PM.',
     tactics: [
-      'Block your calendar 1:30–3 PM for admin/meetings — don\'t fight the biology',
+      "Block your calendar 1:30–3 PM for admin/meetings — don\'t fight the biology",
       'If you can: a 20-min nap (set alarm) gives you 3+ hours of extra alertness',
       'Walk again if you didn\'t at lunch — even 10 min helps',
       'Drink water — dehydration amplifies the dip',
     ],
-    avoid: 'Starting your most important deep work task during the dip — you\'ll struggle and produce worse work.',
+    avoid: "Starting your most important deep work task during the dip — you\'ll struggle and produce worse work.",
   },
 ]
 
@@ -178,7 +177,6 @@ const DAY_TEMPLATES = [
       { category: 'Deep Work',    hours: 3 },
       { category: 'Admin',        hours: 2 },
       { category: 'Learning',     hours: 1 },
-      { category: 'Meals',        hours: 1.5 },
       { category: 'Exercise',     hours: 0.5 },
       { category: 'Rest',         hours: 0.5 },
     ],
@@ -191,7 +189,6 @@ const DAY_TEMPLATES = [
     allocations: [
       { category: 'Deep Work',    hours: 4.5 },
       { category: 'Admin',        hours: 1 },
-      { category: 'Meals',        hours: 1.5 },
       { category: 'Exercise',     hours: 0.5 },
       { category: 'Rest',         hours: 0.5 },
     ],
@@ -206,7 +203,6 @@ const DAY_TEMPLATES = [
       { category: 'Rest',          hours: 2 },
       { category: 'Exercise',      hours: 1 },
       { category: 'Social',        hours: 2 },
-      { category: 'Meals',         hours: 1.5 },
     ],
   },
   {
@@ -218,7 +214,6 @@ const DAY_TEMPLATES = [
       { category: 'Deep Work',    hours: 2 },
       { category: 'Learning',     hours: 2.5 },
       { category: 'Admin',        hours: 1 },
-      { category: 'Meals',        hours: 1.5 },
       { category: 'Exercise',     hours: 0.5 },
       { category: 'Rest',         hours: 0.5 },
     ],
@@ -226,43 +221,30 @@ const DAY_TEMPLATES = [
   {
     id: 'recovery',
     label: '🧘 Recovery Day',
-    desc: "Low intensity — when you're tired or need to recharge",
+    desc: "Low intensity — when you\'re tired or need to recharge",
     tip: 'Even on recovery days, 1h of real focus moves the needle.',
     allocations: [
       { category: 'Admin',        hours: 2 },
       { category: 'Deep Work',    hours: 1 },
       { category: 'Exercise',     hours: 1 },
       { category: 'Rest',         hours: 2 },
-      { category: 'Meals',        hours: 1.5 },
       { category: 'Social',       hours: 0.5 },
     ],
   },
 ]
 
-const CATEGORIES = Object.keys(CATEGORY_COLORS)
-
 export default function BudgetPlanner({ userId, date }: Props) {
-  const [budgets, setBudgets]             = useState<AttentionBudget[]>([])
-  const [newCategory, setNewCategory]     = useState(CATEGORIES[0])
-  const [newHours, setNewHours]           = useState(1)
-  const [loading, setLoading]             = useState(true)
-  const [saving, setSaving]               = useState(false)
+  const [budgets, setBudgets]               = useState<AttentionBudget[]>([])
+  const [loading, setLoading]               = useState(true)
   const [applyingTemplate, setApplyingTemplate] = useState(false)
-  const [expandedMeta, setExpandedMeta]   = useState<string | null>(null)
-  const [showTemplates, setShowTemplates] = useState(true)
-  const [showFragments, setShowFragments] = useState(false)
+  const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null)
+  const [showFAQ, setShowFAQ]               = useState(false)
   const [expandedFragment, setExpandedFragment] = useState<string | null>(null)
-
-
-  const totalAllocated  = budgets.reduce((sum, b) => sum + b.hours_allocated, 0)
-  const isOverBudget    = totalAllocated + newHours > 16
+  const [faqSection, setFaqSection]         = useState<'fragments' | 'categories'>('fragments')
 
   useEffect(() => {
-        // Reset UI state before fetching - works on mount AND date change
-      setBudgets([])
-      setShowTemplates(true)   // re-open template picker for the new day
-      setExpandedMeta(null)
-
+    setBudgets([])
+    setAppliedTemplateId(null)
     setLoading(true)
     const fetchBudgets = async () => {
       const { data } = await supabase
@@ -272,8 +254,15 @@ export default function BudgetPlanner({ userId, date }: Props) {
         .eq('date', date)
         .order('created_at')
       setBudgets(data ?? [])
-      // If there are already budgets for today, keep templates collapsed
-      if ((data ?? []).length > 0) setShowTemplates(false)
+      if ((data ?? []).length > 0) {
+        // Try to match the existing budgets back to a template
+        const match = DAY_TEMPLATES.find(t => {
+          const cats = t.allocations.map(a => a.category).sort().join(',')
+          const existing = (data ?? []).map(b => b.category).sort().join(',')
+          return cats === existing
+        })
+        setAppliedTemplateId(match?.id ?? '__custom__')
+      }
       setLoading(false)
     }
     fetchBudgets()
@@ -296,32 +285,8 @@ export default function BudgetPlanner({ userId, date }: Props) {
     }))
     const { data } = await supabase.from('attention_budgets').insert(inserts).select()
     setBudgets(data ?? [])
-    setShowTemplates(false)
+    setAppliedTemplateId(templateId)
     setApplyingTemplate(false)
-  }
-
-  const addBudget = async () => {
-    if (isOverBudget || saving) return
-    setSaving(true)
-    const { data } = await supabase
-      .from('attention_budgets')
-      .insert({ user_id: userId, date, category: newCategory, hours_allocated: newHours, hours_used: 0, color: CATEGORY_COLORS[newCategory] ?? '#6366f1' })
-      .select().single()
-    if (data) setBudgets(prev => [...prev, data])
-    setSaving(false)
-  }
-
-  const deleteBudget = async (id: string) => {
-    await supabase.from('attention_budgets').delete().eq('id', id)
-    setBudgets(prev => prev.filter(b => b.id !== id))
-  }
-
-  const onDragEnd = (result: DropResult) => {
-    if (!result.destination) return
-    const reordered = Array.from(budgets)
-    const [moved] = reordered.splice(result.source.index, 1)
-    reordered.splice(result.destination.index, 0, moved)
-    setBudgets(reordered)
   }
 
   if (loading) return (
@@ -330,26 +295,159 @@ export default function BudgetPlanner({ userId, date }: Props) {
     </div>
   )
 
-  return (
-    <div className="space-y-5">
+  const appliedTemplate = DAY_TEMPLATES.find(t => t.id === appliedTemplateId)
 
-      {/* Day Templates */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-        <button
-          onClick={() => setShowTemplates(v => !v)}
-          className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-800/40 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-white text-sm font-semibold">Quick-start templates</span>
-            {budgets.length === 0 && (
-              <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full">Start here</span>
-            )}
+  return (
+    <div className="space-y-4">
+
+      {/* FAQ Modal */}
+      {showFAQ && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowFAQ(false)}>
+          <div
+            className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-800 flex-shrink-0">
+              <p className="text-white font-semibold text-sm">FAQ</p>
+              <button onClick={() => setShowFAQ(false)} className="p-1.5 text-gray-500 hover:text-white rounded-lg hover:bg-gray-800 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Section tabs */}
+            <div className="flex gap-1 px-4 pt-3 pb-2 border-b border-gray-800 flex-shrink-0">
+              <button
+                onClick={() => setFaqSection('fragments')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-colors ${faqSection === 'fragments' ? 'bg-yellow-600/20 text-yellow-400 border border-yellow-600/30' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                <Zap className="w-3.5 h-3.5" /> Fragment time playbook
+              </button>
+              <button
+                onClick={() => setFaqSection('categories')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-colors ${faqSection === 'categories' ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-600/30' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                <Info className="w-3.5 h-3.5" /> What each category means
+              </button>
+            </div>
+
+            {/* Scrollable content */}
+            <div className="overflow-y-auto flex-1 px-4 py-4">
+              {faqSection === 'fragments' && (
+                <div>
+                  <p className="text-xs text-yellow-400/80 font-semibold mb-1">+2–3h/day hidden</p>
+                  <p className="text-gray-500 text-xs mb-4 leading-relaxed">
+                    Fragment time = the gaps between your main blocks (commute, lunch, waiting, the post-lunch dip). Most people lose 2–3 hours a day here. Tap each window to see exactly what to do with it.
+                  </p>
+                  <div className="space-y-2">
+                    {FRAGMENT_SLOTS.map(slot => (
+                      <div key={slot.id} className="rounded-xl border border-gray-700 overflow-hidden">
+                        <button
+                          onClick={() => setExpandedFragment(expandedFragment === slot.id ? null : slot.id)}
+                          className="w-full flex items-center gap-3 px-3.5 py-3 hover:bg-gray-800/60 transition-colors text-left"
+                        >
+                          <span className="text-xl flex-shrink-0">{slot.emoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-white text-sm font-medium">{slot.label}</p>
+                              <span className="text-gray-600 text-xs">{slot.duration}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-xs">{slot.bestEmoji}</span>
+                              <span className="text-xs font-medium" style={{ color: slot.color }}>Best use: {slot.best}</span>
+                            </div>
+                          </div>
+                          {expandedFragment === slot.id
+                            ? <ChevronUp className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                            : <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />}
+                        </button>
+                        {expandedFragment === slot.id && (
+                          <div className="px-4 pb-4 pt-1 bg-gray-800/30 border-t border-gray-700/50 space-y-3">
+                            <div className="text-gray-500 text-xs leading-relaxed italic">{slot.context}</div>
+                            <div className="bg-gray-900 rounded-xl p-3 border border-gray-700">
+                              <p className="text-xs font-semibold mb-1" style={{ color: slot.color }}>💡 Why this works</p>
+                              <p className="text-gray-300 text-xs leading-relaxed">{slot.why}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-400 text-xs font-semibold mb-2">✅ Tactics</p>
+                              <div className="space-y-1.5">
+                                {slot.tactics.map((t, i) => (
+                                  <div key={i} className="flex items-start gap-2">
+                                    <span className="text-gray-600 text-xs mt-0.5 flex-shrink-0">{i + 1}.</span>
+                                    <p className="text-gray-300 text-xs leading-relaxed">{t}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="bg-red-950/20 border border-red-900/30 rounded-xl p-3">
+                              <p className="text-red-400 text-xs font-semibold mb-1">🚫 Avoid</p>
+                              <p className="text-gray-400 text-xs leading-relaxed">{slot.avoid}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {faqSection === 'categories' && (
+                <div className="space-y-3">
+                  {Object.entries(CATEGORY_META).map(([cat, meta]) => (
+                    <div key={cat} className="flex gap-3 p-3 bg-gray-800 rounded-xl">
+                      <span className="text-2xl flex-shrink-0">{meta.emoji}</span>
+                      <div>
+                        <p className="text-white text-sm font-semibold">{cat}</p>
+                        <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">{meta.what}</p>
+                        <p className="text-gray-600 text-xs mt-1"><span className="text-gray-500">e.g.</span> {meta.examples}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-          {showTemplates ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
-        </button>
-        {showTemplates && (
-          <div className="px-4 pb-4 space-y-2">
-            <p className="text-gray-500 text-xs mb-3">Pick a template based on how you want today to go. You can adjust after.</p>
+        </div>
+      )}
+
+      {/* Plan section */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-800">
+          <p className="text-white text-sm font-semibold">
+            {appliedTemplateId ? "Today's plan" : 'Choose your day'}
+          </p>
+          <button
+            onClick={() => setShowFAQ(true)}
+            title="FAQ"
+            className="flex items-center gap-1 text-gray-500 hover:text-indigo-400 transition-colors text-xs"
+          >
+            <HelpCircle className="w-4 h-4" />
+            <span className="hidden sm:inline">FAQ</span>
+          </button>
+        </div>
+
+        {appliedTemplateId && appliedTemplate ? (
+          /* Applied state — show confirmation only */
+          <div className="px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-white text-sm font-medium">{appliedTemplate.label}</p>
+                <p className="text-gray-500 text-xs mt-0.5">{appliedTemplate.desc}</p>
+                <p className="text-gray-600 text-xs mt-1 italic">"{appliedTemplate.tip}"</p>
+              </div>
+              <span className="text-green-400 text-sm flex-shrink-0 ml-3">✓</span>
+            </div>
+            <button
+              onClick={() => setAppliedTemplateId(null)}
+              className="mt-3 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              Change plan →
+            </button>
+          </div>
+        ) : (
+          /* Template picker */
+          <div className="px-4 pb-4 pt-3 space-y-2">
+            <p className="text-gray-500 text-xs mb-3">Pick a template based on how you want today to go.</p>
             {DAY_TEMPLATES.map(t => (
               <button
                 key={t.id}
@@ -364,7 +462,7 @@ export default function BudgetPlanner({ userId, date }: Props) {
                     <div className="flex gap-1.5 mt-2 flex-wrap">
                       {t.allocations.map(a => (
                         <span key={a.category} className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">
-                          {CATEGORY_META[a.category]?.emoji} {a.category} {a.hours}h
+                          {CATEGORY_META[a.category]?.emoji} {a.category}
                         </span>
                       ))}
                     </div>
@@ -378,201 +476,6 @@ export default function BudgetPlanner({ userId, date }: Props) {
         )}
       </div>
 
-      {/* Fragment Time Playbook */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-        <button
-          onClick={() => setShowFragments(v => !v)}
-          className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-gray-800/40 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-yellow-400" />
-            <span className="text-white text-sm font-semibold">Fragment time playbook</span>
-            <span className="text-xs bg-yellow-600/20 text-yellow-400 border border-yellow-600/30 px-2 py-0.5 rounded-full">+2–3h/day hidden</span>
-          </div>
-          {showFragments ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
-        </button>
-        {showFragments && (
-          <div className="px-4 pb-4">
-            <p className="text-gray-500 text-xs mb-4 leading-relaxed">
-              Fragment time = the gaps between your main blocks (commute, lunch, waiting, the post-lunch dip). Most people lose 2–3 hours a day here. Tap each window to see exactly what to do with it.
-            </p>
-            <div className="space-y-2">
-              {FRAGMENT_SLOTS.map(slot => (
-                <div key={slot.id} className="rounded-xl border border-gray-700 overflow-hidden">
-                  <button
-                    onClick={() => setExpandedFragment(expandedFragment === slot.id ? null : slot.id)}
-                    className="w-full flex items-center gap-3 px-3.5 py-3 hover:bg-gray-800/60 transition-colors text-left"
-                  >
-                    <span className="text-xl flex-shrink-0">{slot.emoji}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-white text-sm font-medium">{slot.label}</p>
-                        <span className="text-gray-600 text-xs">{slot.duration}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-xs">{slot.bestEmoji}</span>
-                        <span className="text-xs font-medium" style={{ color: slot.color }}>Best use: {slot.best}</span>
-                      </div>
-                    </div>
-                    {expandedFragment === slot.id
-                      ? <ChevronUp className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                      : <ChevronDown className="w-4 h-4 text-gray-500 flex-shrink-0" />}
-                  </button>
-                  {expandedFragment === slot.id && (
-                    <div className="px-4 pb-4 pt-1 bg-gray-800/30 border-t border-gray-700/50 space-y-3">
-                      <div className="text-gray-500 text-xs leading-relaxed italic">{slot.context}</div>
-                      <div className="bg-gray-900 rounded-xl p-3 border border-gray-700">
-                        <p className="text-xs font-semibold mb-1" style={{ color: slot.color }}>💡 Why this works</p>
-                        <p className="text-gray-300 text-xs leading-relaxed">{slot.why}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400 text-xs font-semibold mb-2">✅ Tactics</p>
-                        <div className="space-y-1.5">
-                          {slot.tactics.map((t, i) => (
-                            <div key={i} className="flex items-start gap-2">
-                              <span className="text-gray-600 text-xs mt-0.5 flex-shrink-0">{i + 1}.</span>
-                              <p className="text-gray-300 text-xs leading-relaxed">{t}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="bg-red-950/20 border border-red-900/30 rounded-xl p-3">
-                        <p className="text-red-400 text-xs font-semibold mb-1">🚫 Avoid</p>
-                        <p className="text-gray-400 text-xs leading-relaxed">{slot.avoid}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Category explainer */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-        <button
-          onClick={() => setExpandedMeta(expandedMeta === '__all__' ? null : '__all__')}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-800/40 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <Info className="w-4 h-4 text-indigo-400" />
-            <span className="text-gray-300 text-sm font-medium">What does each category mean?</span>
-          </div>
-          {expandedMeta === '__all__' ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
-        </button>
-        {expandedMeta === '__all__' && (
-          <div className="px-4 pb-4 space-y-3">
-            {Object.entries(CATEGORY_META).map(([cat, meta]) => (
-              <div key={cat} className="flex gap-3 p-3 bg-gray-800 rounded-xl">
-                <span className="text-2xl flex-shrink-0">{meta.emoji}</span>
-                <div>
-                  <p className="text-white text-sm font-semibold">{cat}</p>
-                  <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">{meta.what}</p>
-                  <p className="text-gray-600 text-xs mt-1"><span className="text-gray-500">e.g.</span> {meta.examples}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Draggable budget list */}
-      <DragDropContext onDragEnd={onDragEnd}>
-        <Droppable droppableId="budgets">
-          {(provided) => (
-            <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2">
-              {budgets.length === 0 && (
-                <div className="text-center py-8 text-gray-600 text-sm bg-gray-900 border border-gray-800 rounded-2xl">
-                  <p className="text-2xl mb-2">☝️</p>
-                  <p>Pick a template above, or add categories manually below</p>
-                </div>
-              )}
-              {budgets.map((budget, index) => {
-                const meta = CATEGORY_META[budget.category]
-                return (
-                  <Draggable key={budget.id} draggableId={budget.id} index={index}>
-                    {(provided, snapshot) => (
-                      <div ref={provided.innerRef} {...provided.draggableProps}
-                        className={`bg-gray-800 rounded-xl border transition-all ${
-                          snapshot.isDragging
-                            ? 'border-indigo-500 shadow-lg shadow-indigo-500/10 scale-[1.01]'
-                            : 'border-gray-700 hover:border-gray-600'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 p-3.5">
-                          <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
-                            <GripVertical className="w-4 h-4 text-gray-600" />
-                          </div>
-                          <span className="text-lg">{meta?.emoji ?? '📌'}</span>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="text-white text-sm font-medium">{budget.category}</p>
-                              <button
-                                onClick={() => setExpandedMeta(expandedMeta === budget.category ? null : budget.category)}
-                                className="text-gray-600 hover:text-indigo-400 transition-colors"
-                                title="What does this mean?">
-                                <Info className="w-3 h-3" />
-                              </button>
-                            </div>
-                            <div className="mt-1.5 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                              <div className="h-full rounded-full transition-all duration-500"
-                                style={{ width: `${Math.min((budget.hours_used / budget.hours_allocated) * 100, 100)}%`, backgroundColor: budget.color }} />
-                            </div>
-                          </div>
-                          <span className="text-gray-400 text-xs whitespace-nowrap">
-                            {budget.hours_used.toFixed(1)}h / {budget.hours_allocated}h
-                          </span>
-                          <button onClick={() => deleteBudget(budget.id)} className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                        {expandedMeta === budget.category && meta && (
-                          <div className="px-4 pb-3 pt-0">
-                            <div className="bg-gray-900 rounded-lg p-3 border border-gray-700">
-                              <p className="text-gray-300 text-xs leading-relaxed">{meta.what}</p>
-                              <p className="text-gray-500 text-xs mt-1"><span className="text-gray-400">Examples:</span> {meta.examples}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </Draggable>
-                )
-              })}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
-
-      {/* Add manually */}
-      <div>
-        <p className="text-gray-600 text-xs mb-2 px-1">Or add manually:</p>
-        <div className="flex items-center gap-2 bg-gray-800/40 rounded-xl p-3 border border-gray-700 border-dashed">
-          <select value={newCategory} onChange={e => setNewCategory(e.target.value)}
-            className="flex-1 bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-700 outline-none cursor-pointer">
-            {CATEGORIES.map(c => (
-              <option key={c} value={c}>{CATEGORY_META[c]?.emoji ?? ''} {c}</option>
-            ))}
-          </select>
-          <div className="flex items-center gap-1">
-            <input type="number" min={0.5} max={16} step={0.5} value={newHours}
-              onChange={e => setNewHours(Number(e.target.value))}
-              className="w-16 bg-gray-800 text-white text-sm px-2 py-2 rounded-lg border border-gray-700 outline-none text-center" />
-            <span className="text-gray-500 text-sm">h</span>
-          </div>
-          <button onClick={addBudget} disabled={isOverBudget || saving}
-            className="p-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex-shrink-0">
-            {saving
-              ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
-              : <Plus className="w-4 h-4" />}
-          </button>
-        </div>
-        {isOverBudget && (
-          <p className="text-xs text-red-400 text-center mt-2">Adding {newHours}h would exceed the 16h daily maximum</p>
-        )}
-      </div>
     </div>
   )
 }

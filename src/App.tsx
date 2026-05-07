@@ -302,11 +302,13 @@ export default function App() {
               <h2 className="text-xl font-bold text-white">Attention Planner</h2>
               <p className="text-gray-500 text-sm mt-0.5">{todayLabel}</p>
             </div>
-            <div className="bg-indigo-950/30 border border-indigo-900/40 rounded-xl px-4 py-3 mb-4">
-              <p className="text-indigo-300 text-xs leading-relaxed">
-                💡 <strong>How this works:</strong> Decide upfront how many hours to give each area of your life today. When you have a plan, you’re 2× more likely to stick to it.
-              </p>
-            </div>
+            {!hasBudget && (
+              <div className="bg-indigo-950/30 border border-indigo-900/40 rounded-xl px-4 py-3 mb-4">
+                <p className="text-indigo-300 text-xs leading-relaxed">
+                  💡 <strong>How this works:</strong> Decide upfront how many hours to give each area of your life today. When you have a plan, you’re 2× more likely to stick to it.
+                </p>
+              </div>
+            )}
             <BudgetPlanner userId={user.id} date={today} />
           </>
         )}
@@ -335,11 +337,13 @@ export default function App() {
               <h2 className="text-xl font-bold text-white">Deliberate Practice</h2>
               <p className="text-gray-500 text-sm mt-0.5">Track mastery. Every hour compounds.</p>
             </div>
-            <div className="bg-indigo-950/30 border border-indigo-900/40 rounded-xl px-4 py-3 mb-4">
-              <p className="text-indigo-300 text-xs leading-relaxed">
-                💡 <strong>How this works:</strong> Add a skill you’re building. After every practice session, log the time, difficulty, and quality. Milestones unlock at 10h → 25h → 50h → 100h. The 10,000-hour rule starts with rep one.
-              </p>
-            </div>
+            {!hasSkills && (
+              <div className="bg-indigo-950/30 border border-indigo-900/40 rounded-xl px-4 py-3 mb-4">
+                <p className="text-indigo-300 text-xs leading-relaxed">
+                  💡 <strong>How this works:</strong> Add a skill you’re building. Log every session with a target weakness and a next intention. Milestones unlock at 10h → 25h → 50h → 100h. The 10,000-hour rule starts with rep one.
+                </p>
+              </div>
+            )}
             <PracticeTracker userId={user.id} />
           </>
         )}
@@ -364,11 +368,13 @@ export default function App() {
             <h2 className="text-xl font-bold text-white">Focus Timer</h2>
             <p className="text-gray-500 text-sm mt-0.5">25 min focus · 5 min break · repeat</p>
           </div>
-          <div className="bg-indigo-950/30 border border-indigo-900/40 rounded-xl px-4 py-3 mb-4">
-            <p className="text-indigo-300 text-xs leading-relaxed">
-              💡 <strong>How this works:</strong> Work in 25-min blocks. No phone, no tabs. If you get distracted, tap ⚠️ to log it — awareness is how you improve. Take a 🌿 break after each cycle.
-            </p>
-          </div>
+          {!hasSessions && (
+            <div className="bg-indigo-950/30 border border-indigo-900/40 rounded-xl px-4 py-3 mb-4">
+              <p className="text-indigo-300 text-xs leading-relaxed">
+                💡 <strong>How this works:</strong> Work in 25-min blocks. No phone, no tabs. If you get distracted, tap ⚠️ to log it — awareness is how you improve. Take a 🌿 break after each cycle.
+              </p>
+            </div>
+          )}
           <PomodoroTimer
             userId={user.id}
             date={today}
