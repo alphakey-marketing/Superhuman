@@ -26,7 +26,7 @@ const CATEGORY_META: Record<string, { emoji: string; what: string; examples: str
   },
   'Admin': {
     emoji: '📋',
-    what: "Routine, low-focus tasks that keep things running but don\'t stretch your brain.",
+    what: "Routine, low-focus tasks that keep things running but don't stretch your brain.",
     examples: 'Emails, meetings, scheduling, filing, form-filling, quick replies',
   },
   'Exercise': {
