@@ -73,7 +73,7 @@ export default function Dashboard({ userId, today, onNavigate }: Props) {
 
   const exportCSV = () => {
     const rows = [['Date', 'Focus Minutes', 'Cycles', 'Distractions'],
-      ...todaySessions.map(s => [today, s.completed_cycles * 25, s.completed_cycles, s.distractions_count])]
+      ...todaySessions.map(s => [today, s.completed_cycles * 25, s.completed_cycles, s.distractions_count ?? 0])]
     const csv = rows.map(r => r.join(',')).join('\n')
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))

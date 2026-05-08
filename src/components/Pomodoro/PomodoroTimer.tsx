@@ -83,11 +83,13 @@ export default function PomodoroTimer({ userId, date, hasBudget, onRunningChange
   const selectedPracticeSubSkillIdRef = useRef(selectedPracticeSubSkillId)
   const taskNoteRef                 = useRef(taskNote)
   const userIdRef                   = useRef(userId)
+  const onSessionCompleteRef        = useRef(onSessionComplete)
   practiceModeRef.current             = practiceMode
   selectedPracticeSkillIdRef.current  = selectedPracticeSkillId
   selectedPracticeSubSkillIdRef.current = selectedPracticeSubSkillId
   taskNoteRef.current                 = taskNote
   userIdRef.current                   = userId
+  onSessionCompleteRef.current        = onSessionComplete
 
   const { mode, timeLeft, isRunning, cycles, distractions, sessionDistractions } = state
 
@@ -197,7 +199,7 @@ export default function PomodoroTimer({ userId, date, hasBudget, onRunningChange
     const skillId = selectedPracticeSkillIdRef.current
     if (cycles > prevCyclesRef.current) {
       // Notify App that a session was completed so hasSessions flag updates (hides tip card)
-      onSessionComplete?.()
+      onSessionCompleteRef.current?.()
 
       if (practiceModeRef.current && skillId) {
         const autoLog = async () => {
