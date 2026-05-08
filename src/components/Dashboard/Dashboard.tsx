@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { TrendingUp, Target, Zap, Download } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { AttentionBudget, PomodoroSession } from '../../types'
+import { PomodoroSession } from '../../types'
+import StreakWidget from '../Analytics/StreakWidget'
 
 interface Props {
   userId: string
@@ -30,51 +30,26 @@ const TOOLTIP_LABEL_STYLE = {
   marginBottom: '2px',
 }
 
-function PieTooltip({ active, payload }: any) {
-  if (!active || !payload?.length) return null
-  const { name, value, payload: { color } } = payload[0]
-  return (
-    <div style={{
-      backgroundColor: '#0f172a',
-      border: `1.5px solid ${color}`,
-      borderRadius: '10px',
-      padding: '8px 14px',
-      boxShadow: '0 4px 24px rgba(0,0,0,0.7)',
-    }}>
-      <div className="flex items-center gap-2">
-        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-        <span style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '13px' }}>{name}</span>
-      </div>
-      <p style={{ color: '#a5b4fc', fontWeight: 600, fontSize: '13px', marginTop: '2px' }}>
-        {value}h allocated
-      </p>
-    </div>
-  )
-}
-
 export default function Dashboard({ userId, today, onNavigate }: Props) {
-  const [budgets, setBudgets] = useState<AttentionBudget[]>([])
   const [sessions, setSessions] = useState<PomodoroSession[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setLoading(true)
-    setBudgets([])
     setSessions([])
     const fetchData = async () => {
       const weekAgo = new Date(new Date(today).getTime() - 7 * 86400000).toISOString()
-      const [{ data: b }, { data: s }] = await Promise.all([
-        supabase.from('attention_budgets').select('*').eq('user_id', userId).eq('date', today),
-        supabase.from('pomodoro_sessions').select('*').eq('user_id', userId).gte('started_at', weekAgo).in('status', ['completed', 'active']),
-      ])
-      setBudgets(b ?? [])
+      const { data: s } = await supabase
+        .from('pomodoro_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('started_at', weekAgo)
+        .in('status', ['completed', 'active'])
       setSessions(s ?? [])
       setLoading(false)
     }
     fetchData()
   }, [userId, today])
-
-  const pieData = budgets.map(b => ({ name: b.category, value: b.hours_allocated, color: b.color }))
 
   const weeklyData = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(new Date(today).getTime() - (6 - i) * 86400000)
@@ -97,11 +72,12 @@ export default function Dashboard({ userId, today, onNavigate }: Props) {
   const scoreColor = focusScore >= 80 ? 'text-green-400' : focusScore >= 50 ? 'text-yellow-400' : 'text-red-400'
 
   const exportCSV = () => {
-    const rows = [['Date', 'Category', 'Hours Allocated', 'Hours Used'], ...budgets.map(b => [b.date, b.category, b.hours_allocated, b.hours_used])]
+    const rows = [['Date', 'Focus Minutes', 'Cycles', 'Distractions'],
+      ...todaySessions.map(s => [today, s.completed_cycles * 25, s.completed_cycles, s.distractions_count])]
     const csv = rows.map(r => r.join(',')).join('\n')
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    a.download = `attention-budget-${today}.csv`
+    a.download = `focus-score-${today}.csv`
     a.click()
   }
 
@@ -146,40 +122,9 @@ export default function Dashboard({ userId, today, onNavigate }: Props) {
         </div>
       </div>
 
-      {/* Charts */}
+      {/* Streak + Weekly chart */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-gray-900 rounded-2xl p-4 border border-gray-800">
-          <h4 className="text-gray-300 text-sm font-medium mb-1">Today's Allocation</h4>
-          {pieData.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={52} outerRadius={76} dataKey="value" paddingAngle={3} strokeWidth={0}>
-                    {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                  </Pie>
-                  <Tooltip content={<PieTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center mt-1">
-                {pieData.map(d => (
-                  <div key={d.name} className="flex items-center gap-1 text-xs text-gray-300">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />{d.name}
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="h-44 flex flex-col items-center justify-center gap-2">
-              <p className="text-gray-600 text-sm text-center">No plan yet for today</p>
-              <button
-                onClick={() => onNavigate('budget')}
-                className="text-xs text-indigo-400 hover:text-indigo-300 underline underline-offset-2 transition-colors"
-              >
-                Go to Planner →
-              </button>
-            </div>
-          )}
-        </div>
+        <StreakWidget userId={userId} today={today} />
 
         <div className="bg-gray-900 rounded-2xl p-4 border border-gray-800">
           <h4 className="text-gray-300 text-sm font-medium mb-3">Weekly Focus Hours</h4>

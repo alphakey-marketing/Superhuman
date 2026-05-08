@@ -8,10 +8,12 @@ import { toLocalDateStr } from '../../lib/date'
 interface Props {
   userId: string
   date: string
+  hasBudget?: boolean
   onRunningChange?: (running: boolean) => void
   onTimeLeftChange?: (timeLeft: number | null) => void
   onBreakRequest?: () => void
   onNavigate?: (tab: string) => void
+  onSessionComplete?: () => void
 }
 
 const MODE_LABELS: Record<PomodoroMode, string> = {
@@ -57,7 +59,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
   'Meals':         '🍽️',
 }
 
-export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLeftChange, onBreakRequest, onNavigate }: Props) {
+export default function PomodoroTimer({ userId, date, hasBudget, onRunningChange, onTimeLeftChange, onBreakRequest, onNavigate, onSessionComplete }: Props) {
   // Pass date into the hook so hydration re-runs on midnight rollover
   const { state, start, pause, reset, abandon, addDistraction, setTask, switchMode } = usePomodoro(userId, date)
 
@@ -112,6 +114,12 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
     setBudgets([])
     loadBudgets()
   }, [loadBudgets])
+
+  // Re-fetch budgets when a plan is applied from the Planner tab
+  // (hasBudget goes false→true when the user picks a template then switches to Timer)
+  useEffect(() => {
+    if (hasBudget) loadBudgets()
+  }, [hasBudget, loadBudgets])
 
   // Re-fetch after each completed cycle to keep hours_used accurate
   useEffect(() => { if (cycles > 0) loadBudgets() }, [cycles, loadBudgets])
@@ -187,29 +195,34 @@ export default function PomodoroTimer({ userId, date, onRunningChange, onTimeLef
 
   useEffect(() => {
     const skillId = selectedPracticeSkillIdRef.current
-    if (cycles > prevCyclesRef.current && practiceModeRef.current && skillId) {
-      const autoLog = async () => {
-        const today = toLocalDateStr()
-        const note = taskNoteRef.current.trim()
-        const { data: sessionData } = await supabase.from('practice_sessions').insert({
-          user_id: userIdRef.current,
-          skill_id: skillId,
-          sub_skill_id: selectedPracticeSubSkillIdRef.current ?? null,
-          date: today,
-          duration_minutes: 25,
-          difficulty: 3,
-          quality: 3,
-          target_weakness: note || null,
-          notes: note ? `[Pomodoro] ${note}` : '[Pomodoro auto-logged]',
-        }).select().single()
-        if (sessionData) {
-          setPracticeSkills(prev => prev.map(s => s.id === skillId
-            ? { ...s, total_hours: s.total_hours + 25 / 60 }
-            : s
-          ))
+    if (cycles > prevCyclesRef.current) {
+      // Notify App that a session was completed so hasSessions flag updates (hides tip card)
+      onSessionComplete?.()
+
+      if (practiceModeRef.current && skillId) {
+        const autoLog = async () => {
+          const today = toLocalDateStr()
+          const note = taskNoteRef.current.trim()
+          const { data: sessionData } = await supabase.from('practice_sessions').insert({
+            user_id: userIdRef.current,
+            skill_id: skillId,
+            sub_skill_id: selectedPracticeSubSkillIdRef.current ?? null,
+            date: today,
+            duration_minutes: 25,
+            difficulty: 3,
+            quality: 3,
+            target_weakness: note || null,
+            notes: note ? `[Pomodoro] ${note}` : '[Pomodoro auto-logged]',
+          }).select().single()
+          if (sessionData) {
+            setPracticeSkills(prev => prev.map(s => s.id === skillId
+              ? { ...s, total_hours: s.total_hours + 25 / 60 }
+              : s
+            ))
+          }
         }
+        autoLog()
       }
-      autoLog()
     }
     prevCyclesRef.current = cycles
   }, [cycles])

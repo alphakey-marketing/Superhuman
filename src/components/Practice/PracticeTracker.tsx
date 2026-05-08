@@ -170,8 +170,9 @@ function TodayQueue({
         ? Math.floor((now - new Date(oldestDate + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24))
         : Infinity
       // Only show if not practiced today
+      const confirmedSubSkill = oldestSubSkill // const lets TS narrow safely inside closure
       const practicedToday = sessions.some(
-        s => s.skill_id === skill.id && s.sub_skill_id === oldestSubSkill.id && s.date === today
+        s => s.skill_id === skill.id && s.sub_skill_id === confirmedSubSkill.id && s.date === today
       )
       if (!practicedToday) {
         queue.push({ skill, subSkill: oldestSubSkill, daysSince, lastDate: oldestDate })

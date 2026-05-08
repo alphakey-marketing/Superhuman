@@ -54,6 +54,7 @@ export default function App() {
   const [hasBudget, setHasBudget] = useState(false)
   const [hasSessions, setHasSessions] = useState(false)
   const [hasSkills, setHasSkills] = useState(false)
+  const [hasVault, setHasVault] = useState(false)
 
   // ── Single source of truth for "today" ────────────────────────────────────
   const [today, setToday]           = useState(getTodayStr)
@@ -134,14 +135,16 @@ export default function App() {
 
   // ── QuickStart badge check ──────────────────────────────────────────────
   const checkBadges = useCallback(async (uid: string, date: string) => {
-    const [{ data: b }, { data: s }, { data: sk }] = await Promise.all([
+    const [{ data: b }, { data: s }, { data: sk }, { data: v }] = await Promise.all([
       supabase.from('attention_budgets').select('id').eq('user_id', uid).eq('date', date).limit(1),
       supabase.from('pomodoro_sessions').select('id').eq('user_id', uid).gte('started_at', date).limit(1),
       supabase.from('practice_skills').select('id').eq('user_id', uid).limit(1),
+      supabase.from('motivation_vault').select('id').eq('user_id', uid).limit(1),
     ])
     setHasBudget((b?.length ?? 0) > 0)
     setHasSessions((s?.length ?? 0) > 0)
     setHasSkills((sk?.length ?? 0) > 0)
+    setHasVault((v?.length ?? 0) > 0)
   }, [])
 
   useEffect(() => {
@@ -319,11 +322,13 @@ export default function App() {
               <h2 className="text-xl font-bold text-white">Analytics</h2>
               <p className="text-gray-500 text-sm mt-0.5">Your focus stats and distraction patterns</p>
             </div>
-            <div className="bg-indigo-950/30 border border-indigo-900/40 rounded-xl px-4 py-3 mb-4">
-              <p className="text-indigo-300 text-xs leading-relaxed">
-                💡 <strong>How this works:</strong> Every time you switch tabs during a Pomodoro, it’s auto-logged. Review your patterns here to find your biggest distraction triggers.
-              </p>
-            </div>
+            {!hasSessions && (
+              <div className="bg-indigo-950/30 border border-indigo-900/40 rounded-xl px-4 py-3 mb-4">
+                <p className="text-indigo-300 text-xs leading-relaxed">
+                  💡 <strong>How this works:</strong> Every time you switch tabs during a Pomodoro, it’s auto-logged. Review your patterns here to find your biggest distraction triggers.
+                </p>
+              </div>
+            )}
             <div className="space-y-4">
               <StreakWidget userId={user.id} today={today} />
               <DistractionTracker userId={user.id} today={today} />
@@ -354,11 +359,13 @@ export default function App() {
               <h2 className="text-xl font-bold text-white">Fuel</h2>
               <p className="text-gray-500 text-sm mt-0.5">Your fuel. Your proof. Your fire.</p>
             </div>
-            <div className="bg-orange-950/30 border border-orange-900/40 rounded-xl px-4 py-3 mb-4">
-              <p className="text-orange-300 text-xs leading-relaxed">
-                💡 <strong>How this works:</strong> Store statements that fire you up. Open this tab before a hard session. Pin your best ones to the top. The Spotlight card shows one at random — shuffle it until one hits.
-              </p>
-            </div>
+            {!hasVault && (
+              <div className="bg-orange-950/30 border border-orange-900/40 rounded-xl px-4 py-3 mb-4">
+                <p className="text-orange-300 text-xs leading-relaxed">
+                  💡 <strong>How this works:</strong> Store statements that fire you up. Open this tab before a hard session. Pin your best ones to the top. The Spotlight card shows one at random — shuffle it until one hits.
+                </p>
+              </div>
+            )}
             <MotivationVault userId={user.id} />
           </>
         )}
@@ -378,10 +385,12 @@ export default function App() {
           <PomodoroTimer
             userId={user.id}
             date={today}
+            hasBudget={hasBudget}
             onRunningChange={setPomodoroRunning}
             onTimeLeftChange={setPomodoroTimeLeft}
             onBreakRequest={() => setShowBreak(true)}
             onNavigate={(tab) => setActiveTab(tab as Tab)}
+            onSessionComplete={() => setHasSessions(true)}
           />
         </div>
 
